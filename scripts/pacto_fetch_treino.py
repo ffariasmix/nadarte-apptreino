@@ -2,17 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 pacto_fetch_treino.py — COLETOR REAL (App Treino, agregados por unidade)
-
-Para cada unidade (1 ApiKey), chama os endpoints de BI confirmados e monta
-data/treino.json com os indicadores AGREGADOS por unidade. Sem varrer aluno.
-
-Endpoints (empresaId=1, a ApiKey ja escopa a unidade):
-  /psec/treino-bi/dados?idProfessor=1        -> totais, percUtilizamApp, percentualEmDia, treinos vencidos/em dia
-  /psec/treino-bi/gerados-executados         -> gerados/executados/% execucao (KPI1)
-  /psec/treino-bi/resumo-execucoes-periodo/1 -> execucoes por dia da semana (KPI1)
-  /psec/treino-bi/carteira                   -> acompanhamento/renovacao (KPI8)
-  /psec/treino-bi/contagem-treinos-aprovar   -> treinos a aprovar
-  /psec/avaliacao-fisica-bi?dataInicio&dataFim -> avaliacoes realizadas/atrasadas (KPI4/5)
+idProfessor=0 = TOTAL da unidade.
 """
 import os, sys, json, time, random, datetime, urllib.request, urllib.error
 from concurrent.futures import ThreadPoolExecutor
@@ -71,7 +61,7 @@ def coleta_unidade(uk, ulabel, key):
     df = int(now.timestamp() * 1000)
     di = int((now - datetime.timedelta(days=365)).timestamp() * 1000)
 
-    dados = content(key, "/psec/treino-bi/dados?idProfessor=1")
+    dados = content(key, "/psec/treino-bi/dados?idProfessor=0")  # 0 = TOTAL da unidade (1 = professor 1)
     ge    = content(key, "/psec/treino-bi/gerados-executados")
     execd = content(key, "/psec/treino-bi/resumo-execucoes-periodo/1")
     cart  = content(key, "/psec/treino-bi/carteira")
