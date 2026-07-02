@@ -1,0 +1,46 @@
+name: Coleta + Publica (App Treino)
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Publicar no Cloudflare? (false = só validar)"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "0 6 * * *"
+
+concurrency:
+  group: apptreino-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Coletar dados da API PACTO
+        env:
+          PACTO_KEY_716NORTE: ${{ secrets.PACTO_KEY_716NORTE }}
+          PACTO_KEY_905SUL:    ${{ secrets.PACTO_KEY_905SUL }}
+          PACTO_KEY_604NORTE:  ${{ secrets.PACTO_KEY_604NORTE }}
+          PACTO_KEY_LAGONORTE: ${{ secrets.PACTO_KEY_LAGONORTE }}
+          PACTO_KEY_LAGOSUL:   ${{ secrets.PACTO_KEY_LAGOSUL }}
+          PACTO_KEY_NATAL:     ${{ secrets.PACTO_KEY_NATAL }}
+        run: python scripts/pacto_fetch_treino.py
+
+      - name: Montar + GATE (nao publica se o dado nao fechar)
+        run: python scripts/build_treino.py
+
+      - name: Publicar no Cloudflare Pages
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy == true }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npm i -g wrangler
+          wrangler pages deploy public --project-name=nadarte-apptreino --branch=main
