@@ -1,51 +1,49 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-probe_treino.py — explorador de endpoints (referencia da descoberta).
-Confere rapidamente os endpoints unit-level usados pelo coletor.
-"""
+"""probe v8 (fase2 professores) — indicadores POR PROFESSOR. PII-safe."""
 import os, sys, json, datetime, urllib.request, urllib.error
-
 BASE = "https://apigw.pactosolucoes.com.br"
-KEYS = ["PACTO_KEY_716NORTE", "PACTO_KEY_905SUL", "PACTO_KEY_604NORTE",
-        "PACTO_KEY_LAGONORTE", "PACTO_KEY_LAGOSUL", "PACTO_KEY_NATAL"]
+KEYS = ["PACTO_KEY_716NORTE","PACTO_KEY_905SUL","PACTO_KEY_604NORTE","PACTO_KEY_LAGONORTE","PACTO_KEY_LAGOSUL","PACTO_KEY_NATAL"]
 
-def get(key, path):
-    h = {"Authorization": "Bearer " + key, "Accept": "application/json", "empresaId": "1"}
+def get(key, path, timeout=25):
+    h={"Authorization":"Bearer "+key,"Accept":"application/json","empresaId":"1"}
     try:
-        with urllib.request.urlopen(urllib.request.Request(BASE + path, headers=h), timeout=25) as r:
-            return r.status, r.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        return e.code, (e.read().decode("utf-8", "replace") if e.fp else "")
-    except Exception as ex:
-        return -1, str(ex)[:80]
+        with urllib.request.urlopen(urllib.request.Request(BASE+path,headers=h),timeout=timeout) as r:
+            return r.status, r.read().decode("utf-8","replace")
+    except urllib.error.HTTPError as e: return e.code,(e.read().decode("utf-8","replace") if e.fp else "")
+    except Exception as ex: return -1,str(ex)[:80]
 
-def keys_of(body):
-    try:
-        c = json.loads(body).get("content", {})
-        if isinstance(c, dict):
-            return ", ".join(list(c.keys())[:25])
-        return type(c).__name__
-    except Exception:
-        return "(nao-JSON %d)" % len(body)
+def shape(body):
+    try: j=json.loads(body)
+    except Exception: return "(nao-JSON %d)"%len(body)
+    def d(x,dep=0):
+        if isinstance(x,dict):
+            inner=" ->"+d(x["content"],dep+1) if ("content" in x and dep==0) else ""
+            return "obj{%s}%s"%(", ".join(list(x.keys())[:22]),inner)
+        if isinstance(x,list): return "lista[%d]%s"%(len(x),(" item0="+d(x[0],dep+1) if x else ""))
+        return type(x).__name__
+    return d(j)
 
 def main():
-    key = None
+    key=None
     for k in KEYS:
-        if os.environ.get(k):
-            key = os.environ[k]; break
-    if not key:
-        print("sem chave", file=sys.stderr); sys.exit(1)
-    now = datetime.datetime.utcnow()
-    df = int(now.timestamp() * 1000); di = int((now - datetime.timedelta(days=365)).timestamp() * 1000)
-    for path in [
-        "/psec/treino-bi/dados?idProfessor=0",
-        "/psec/treino-bi/carteira",
-        "/psec/treino-bi/contagem-treinos-aprovar",
-        "/psec/avaliacao-fisica-bi?dataInicio=%d&dataFim=%d" % (di, df),
-    ]:
-        st, body = get(key, path)
-        print("%5s  %-46s  %s" % (st, path[:46], keys_of(body)[:200]), file=sys.stderr)
+        if os.environ.get(k): key=os.environ[k]; break
+    if not key: print("sem chave",file=sys.stderr); sys.exit(1)
+    now=datetime.datetime.utcnow(); df=int(now.timestamp()*1000); di=int((now-datetime.timedelta(days=365)).timestamp()*1000)
+    dts="dataInicio=%d&dataFim=%d"%(di,df)
+    testes=[
+        ("indic-carteira-professores", "/psec/professores/indicadores-carteira-professores"),
+        ("indic-carteira-professores?dts", "/psec/professores/indicadores-carteira-professores?%s"%dts),
+        ("indic-atividade", "/psec/professores/indicadores-atividade"),
+        ("indic-atividade?dts", "/psec/professores/indicadores-atividade?%s"%dts),
+        ("indic-atividades-acumuladas", "/psec/professores/indicadores-atividades-acumuladas"),
+        ("ranking/podium", "/psec/professores/ranking/podium"),
+        ("colab/professores-ativos", "/colaboradores/professores-ativos"),
+        ("colab/bi-professores-vinculos", "/psec/colaboradores/bi-professores-vinculos"),
+        ("colab/all-simple", "/psec/colaboradores/all-simple?page=0&size=5"),
+    ]
+    for nome,path in testes:
+        st,body=get(key,path)
+        print("%5s  %-34s  %s"%(st,nome,shape(body)[:300]),file=sys.stderr)
 
-if __name__ == "__main__":
-    main()
+if __name__=="__main__": main()
