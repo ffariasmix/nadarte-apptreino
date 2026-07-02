@@ -1,0 +1,22 @@
+name: Probe (descobrir endpoints App Treino)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Rodar explorador de endpoints
+        env:
+          PACTO_KEY_716NORTE: ${{ secrets.PACTO_KEY_716NORTE }}
+          PACTO_KEY_905SUL:    ${{ secrets.PACTO_KEY_905SUL }}
+          PACTO_KEY_604NORTE:  ${{ secrets.PACTO_KEY_604NORTE }}
+          PACTO_KEY_LAGONORTE: ${{ secrets.PACTO_KEY_LAGONORTE }}
+          PACTO_KEY_LAGOSUL:   ${{ secrets.PACTO_KEY_LAGOSUL }}
+          PACTO_KEY_NATAL:     ${{ secrets.PACTO_KEY_NATAL }}
+        run: python scripts/probe_treino.py
