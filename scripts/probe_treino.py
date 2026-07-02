@@ -4,13 +4,9 @@
 
 """
 
-probe_treino.py (v3) — confirma a ESTRUTURA real dos endpoints de BI Treino.
+probe_treino.py (v3.1) — confirma a ESTRUTURA real dos endpoints de BI Treino.
 
-Pega 1 cliente real (codigoCliente/matricula/empresa) + codigoPessoa e chama os
-
-endpoints agregados descobertos, imprimindo os campos (chaves) de cada resposta.
-
-PII-safe: so status, chaves e contagens.
+empresaId = 1 (a ApiKey ja escopa a unidade). PII-safe: so status/chaves/contagens.
 
 """
 
@@ -88,8 +84,6 @@ def main():
 
         print("sem chave", file=sys.stderr); sys.exit(1)
 
-    # cliente real -> codigoCliente, matricula, empresa
-
     st, body = get(key, "/clientes/simples?page=0&size=3")
 
     line(st, "clientes/simples", body)
@@ -102,15 +96,13 @@ def main():
 
         cid, mat, empresa = c.get("codigoCliente"), c.get("matricula"), c.get("empresa")
 
-        print("  empresa=%s (cid/mat omitidos)" % empresa, file=sys.stderr)
+        print("  empresa(nome)=%s (cid/mat omitidos)" % empresa, file=sys.stderr)
 
     except Exception:
 
         pass
 
-    emp = empresa if empresa is not None else 1
-
-    # codigoPessoa via dados-pessoais
+    emp = 1  # empresaId (header e path) e SEMPRE 1 — a ApiKey ja escopa a unidade
 
     cp = None
 
@@ -128,8 +120,6 @@ def main():
 
             pass
 
-    # feed de alunos (indicadores de atividade dos professores)
-
     filtros = urllib.parse.quote(json.dumps({"dataInicio": 1704067200000, "dataFim": 1735689599000}))
 
     cfg = urllib.parse.quote(json.dumps({"incluirProfessorInativo": False}))
@@ -138,15 +128,13 @@ def main():
 
     line(st, "professores/indicadores-atividade/alunos", body)
 
-    # BI Treino — agregados
-
     P = cp if cp is not None else 1
 
     testes = [
 
         ("treino-bi/dados?idProfessor=1", "/psec/treino-bi/dados?idProfessor=1"),
 
-        ("treino-bi/resumo-execucoes-periodo/{emp}", "/psec/treino-bi/resumo-execucoes-periodo/%s" % emp),
+        ("treino-bi/resumo-execucoes-periodo/1", "/psec/treino-bi/resumo-execucoes-periodo/1"),
 
         ("treino-bi/alunos-acessos", "/psec/treino-bi/alunos-acessos"),
 
