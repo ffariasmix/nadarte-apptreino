@@ -1,119 +1,84 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-probe_treino.py — EXPLORADOR de endpoints do App Treino na API PACTO (ZillyonWeb)
+probe_treino.py (v2 — mirado) — descobre a familia /psec/alunos/* da API PACTO.
 
-Objetivo: descobrir QUAIS endereços da API entregam os dados que faltam
-(ficha, execução de treino, avaliação física, nota/feedback, atendimento).
-Roda no GitHub Actions, onde as chaves ficam nos Secrets — você não manuseia credencial.
-
-SEGURANÇA (regras da base de conhecimento):
-- NUNCA imprime PII (nome, CPF): só STATUS, CHAVES do JSON e CONTAGENS.
-- Usa as chaves via variáveis de ambiente (Secrets), nunca hardcoded.
-
-Como rodar: via workflow (.github/workflows/probe.yml) OU localmente:
-    PACTO_KEY_716NORTE=xxxx python scripts/probe_treino.py
+Estrategia: pega 1 cliente real de /clientes/simples e chama /psec/alunos/{nome}
+com header empresaId + query cliente=, imprimindo os CAMPOS (chaves) de cada resposta.
+PII-safe: imprime so status, chaves do JSON e contagens (nunca dados pessoais).
 """
-import os, sys, json, time, random, urllib.request, urllib.error
+import os, sys, json, urllib.request, urllib.error
 
 BASE = "https://apigw.pactosolucoes.com.br"
+KEYS = ["PACTO_KEY_716NORTE", "PACTO_KEY_905SUL", "PACTO_KEY_604NORTE",
+        "PACTO_KEY_LAGONORTE", "PACTO_KEY_LAGOSUL", "PACTO_KEY_NATAL"]
 
-# 1 chave por unidade (Secrets do GitHub). Basta 1 para o probe.
-UNITS = [
-    ("716Norte", "PACTO_KEY_716NORTE"),
-    ("905Sul",   "PACTO_KEY_905SUL"),
-    ("604Norte", "PACTO_KEY_604NORTE"),
-    ("LagoNorte","PACTO_KEY_LAGONORTE"),
-    ("LagoSul",  "PACTO_KEY_LAGOSUL"),
-]
+# candidatos sob /psec/alunos/  (cobrindo os 8 indicadores)
+NOMES = ["alunoApp", "ficha", "fichas", "treino", "treinos",
+         "avaliacao", "avaliacoes", "avaliacao-fisica",
+         "feedback", "nota", "notas", "atendimento", "interacao",
+         "chat", "mensagens", "historico", "agenda", "evolucao",
+         "medidas", "foto", "frequencia", "execucao"]
 
-# Caminhos CANDIDATOS a testar (chutes iniciais — confirme pela resposta, não pela doc).
-# Marque aqui novos caminhos conforme forem aparecendo na documentação.
-CANDIDATOS = [
-    # já confirmado (serve de sanity-check de autenticação):
-    "/psec/alunos/alunoApp",
-    # ficha / prescrição de treino:
-    "/treino", "/treinos", "/ficha", "/fichas", "/prescricao", "/programa",
-    "/v1/treino", "/v1/ficha", "/v1/fichas", "/psec/treino", "/psec/ficha",
-    "/psec/alunos/ficha", "/psec/alunos/treino", "/aluno/treino", "/aluno/ficha",
-    # execução de treino (treino realizado):
-    "/execucao-treino", "/treino/execucao", "/ficha/execucao", "/psec/execucao-treino",
-    # avaliação física:
-    "/avaliacao", "/avaliacoes", "/avaliacao-fisica", "/v1/avaliacao",
-    "/psec/avaliacao", "/psec/alunos/avaliacao",
-    # nota / feedback do treino:
-    "/feedback", "/avaliacao-treino", "/treino/nota", "/nota-treino",
-    # atendimento / chat professor->aluno:
-    "/atendimento", "/interacao", "/chat", "/mensagens", "/psec/atendimento",
-    # engajamento / gamificação:
-    "/engajamento", "/gamificacao",
-]
-
-def http_get(key, path, tries=4, timeout=25):
-    """GET com Bearer + backoff. Retorna (status, body_str)."""
-    url = BASE + path
-    for i in range(tries):
-        req = urllib.request.Request(url, headers={
-            "Authorization": "Bearer " + key,
-            "Accept": "application/json",
-        })
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return r.status, r.read().decode("utf-8", "replace")
-        except urllib.error.HTTPError as e:
-            if e.code in (429, 500, 502, 503, 504) and i < tries - 1:
-                time.sleep(min(12, 0.8 * (2 ** i)) + random.random())
-                continue
-            return e.code, (e.read().decode("utf-8", "replace") if e.fp else "")
-        except Exception as ex:
-            if i < tries - 1:
-                time.sleep(1 + i)
-                continue
-            return -1, str(ex)
-    return -1, "sem resposta"
+def get(key, path, empresa=None, timeout=20):
+    h = {"Authorization": "Bearer " + key, "Accept": "application/json"}
+    if empresa is not None:
+        h["empresaId"] = str(empresa)
+    req = urllib.request.Request(BASE + path, headers=h)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.status, r.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        return e.code, (e.read().decode("utf-8", "replace") if e.fp else "")
+    except Exception as ex:
+        return -1, str(ex)[:80]
 
 def shape(body):
-    """Descreve a resposta SEM vazar PII: só tipo, chaves e contagens."""
     try:
         j = json.loads(body)
     except Exception:
-        return "(não-JSON, %d chars)" % len(body)
-    def desc(x, depth=0):
+        return "(nao-JSON %d chars) %s" % (len(body), body[:160].replace("\n", " "))
+    def d(x):
         if isinstance(x, dict):
-            ks = list(x.keys())
-            inner = ""
-            if "content" in x and depth == 0:
-                inner = " content->" + desc(x["content"], depth + 1)
-            return "obj{%s}%s" % (", ".join(ks[:12]), inner)
+            inner = " content->" + d(x["content"]) if "content" in x else ""
+            return "obj{%s}%s" % (", ".join(list(x.keys())[:15]), inner)
         if isinstance(x, list):
-            return "lista[%d]%s" % (len(x), (" item0=" + desc(x[0], depth + 1)) if x else "")
+            return "lista[%d]%s" % (len(x), (" item0=" + d(x[0]) if x else ""))
         return type(x).__name__
-    return desc(j)
+    return d(j)
 
 def main():
-    # usa a primeira chave disponível nos Secrets
-    key = None; unit = None
-    for u, env in UNITS:
-        v = os.environ.get(env)
-        if v:
-            key, unit = v, u
-            break
+    key = None
+    for k in KEYS:
+        if os.environ.get(k):
+            key = os.environ[k]; break
     if not key:
-        print("ERRO: nenhuma PACTO_KEY_* encontrada no ambiente (Secrets).", file=sys.stderr)
-        sys.exit(1)
+        print("sem chave nos Secrets", file=sys.stderr); sys.exit(1)
 
-    print("== PROBE App Treino — unidade de teste:", unit, "==", file=sys.stderr)
-    print(f"{'STATUS':>6}  {'PATH':<34}  FORMATO", file=sys.stderr)
+    # 1) um cliente real (so para obter um codigoCliente valido)
+    st, body = get(key, "/clientes/simples?page=0&size=3")
+    print("clientes/simples ->", st, shape(body)[:200], file=sys.stderr)
+    cid = None
+    try:
+        arr = json.loads(body).get("content") or []
+        if arr:
+            cid = arr[0].get("codigoCliente")
+            print("  (codigoCliente obtido; valor omitido do log)", file=sys.stderr)
+    except Exception:
+        pass
+
+    # 2) familia /psec/alunos/* com empresaId=1 + cliente
+    print("\n%5s  %-22s  %s" % ("STAT", "PATH", "CAMPOS/RESPOSTA"), file=sys.stderr)
     achados = []
-    for path in CANDIDATOS:
-        st, body = http_get(key, path)
-        fmt = shape(body) if st == 200 else ("" if st in (404, 401, 403) else shape(body))
-        print(f"{st:>6}  {path:<34}  {fmt}", file=sys.stderr)
+    for nome in NOMES:
+        p = "/psec/alunos/%s?cliente=%s" % (nome, cid) if cid else "/psec/alunos/%s" % nome
+        st, body = get(key, p, empresa=1)
+        sh = shape(body)
+        print("%5s  /psec/alunos/%-16s  %s" % (st, nome, sh[:220]), file=sys.stderr)
         if st == 200:
-            achados.append({"path": path, "shape": fmt})
-        time.sleep(0.5)  # gentil com o rate-limit
+            achados.append({"path": "/psec/alunos/" + nome, "shape": sh})
 
-    print("\n== ENDPOINTS QUE RESPONDERAM 200 ==", file=sys.stderr)
+    print("\n== RESPONDERAM 200 (usar estes) ==", file=sys.stderr)
     print(json.dumps(achados, ensure_ascii=False, indent=2))
 
 if __name__ == "__main__":
