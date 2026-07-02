@@ -32,6 +32,9 @@
   .kpi .s{font-size:12px;color:var(--muted)}
   .kpi.f2{opacity:.7}.kpi.f2 .v{font-size:15px;color:var(--muted)}
   .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+  .panel h3{margin:0 0 14px;font-size:14.5px;font-weight:800}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:760px){.g2{grid-template-columns:1fr}}
   table{width:100%;border-collapse:collapse;font-size:13px}
   th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);
     font-weight:700;padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -75,38 +78,41 @@ window.DATA = /*__DATA__*/null;
 
   const totAlunos = sum('totalAlunos');
   const K = [
-    {n:'Treinos realizados', dot:'#E8521A', v:fmt(sum('treinosExecutados')), s:'execuções (gerados: '+fmt(sum('treinosGerados'))+')'},
+    {n:'Alunos na base', dot:'#2D2D2D', v:fmt(totAlunos), s:fmt(sum('totalAlunosAtivos'))+' ativos'},
+    {n:'Uso do App Treino', dot:'#8B5CF6', v:pct(wavg('percUtilizamApp','totalAlunos')), s:'% dos alunos que usam o app'},
     {n:'Treinos em dia', dot:'#5BAD6F', v:fmt(sum('totalTreinosEmDia')), s:pct(wavg('percentualEmDia','totalAlunos'))+' da base'},
     {n:'Treinos vencidos', dot:'#D64545', v:fmt(sum('totalTreinosVencidos')), s:'a renovar: '+fmt(sum('totalTreinosRenovar'))},
     {n:'Avaliações realizadas', dot:'#3E7CB1', v:fmt(sum('avaliacoesRealizadas')), s:'últimos 12 meses'},
     {n:'Avaliações vencidas', dot:'#F0A500', v:fmt(sum('avaliacoesAtrasadas')), s:'atrasadas/reavaliar'},
-    {n:'Uso do App Treino', dot:'#8B5CF6', v:pct(wavg('percUtilizamApp','totalAlunos')), s:fmt(totAlunos)+' alunos na base'},
     {n:'Atendimento (professores)', dot:'#0EA5A0', v:fmt(sum('acompanhamentoEm')), s:'alunos em acompanhamento'},
-    {n:'Nota do treino (NPS)', dot:'#9a9a9a', v:'fase 2', s:'nota por aluno — em integração', f2:true},
   ];
   let html = '<div class="sec">Panorama da rede — '+fmt(U.length)+' unidades</div><div class="kgrid">';
   html += K.map(c=>`<div class="kpi ${c.f2?'f2':''}"><div class="n"><span class="dot" style="background:${c.dot}"></span>${c.n}</div><div class="v">${c.v}</div><div class="s">${c.s}</div></div>`).join('');
   html += '</div>';
 
-  const bd = U.map(u=>({label:u.nome, value:Number(u.treinosExecutados)||0})).sort((a,b)=>b.value-a.value);
-  const max = Math.max(...bd.map(b=>b.value),1), w=560, padL=110, padR=60, rowH=34, h=bd.length*rowH+8;
-  let svg = `<svg viewBox="0 0 ${w} ${h}" width="100%" style="max-height:${h}px">`;
-  bd.forEach((d,i)=>{const y=i*rowH+6, bw=(w-padL-padR)*(d.value/max);
-    svg+=`<text x="${padL-8}" y="${y+16}" text-anchor="end" font-size="12.5" font-weight="600" fill="#2D2D2D">${d.label}</text>`;
-    svg+=`<rect x="${padL}" y="${y+4}" width="${w-padL-padR}" height="16" rx="6" fill="#EEEAE4"/>`;
-    svg+=`<rect x="${padL}" y="${y+4}" width="${Math.max(2,bw)}" height="16" rx="6" fill="#E8521A"/>`;
-    svg+=`<text x="${padL+Math.max(2,bw)+8}" y="${y+16}" font-size="12" font-weight="700" fill="#6a6a6a">${fmt(d.value)}</text>`;});
-  svg+='</svg>';
-  html += '<div class="sec">Treinos executados por unidade</div><div class="panel">'+svg+'</div>';
+  function barChart(field, fmtVal, color){
+    const bd = U.map(u=>({label:u.nome, value:Number(u[field])||0})).sort((a,b)=>b.value-a.value);
+    const max = Math.max(...bd.map(b=>b.value),1), w=520, padL=104, padR=64, rowH=32, h=bd.length*rowH+6;
+    let s = `<svg viewBox="0 0 ${w} ${h}" width="100%" style="max-height:${h}px">`;
+    bd.forEach((d,i)=>{const y=i*rowH+4, bw=(w-padL-padR)*(d.value/max);
+      s+=`<text x="${padL-8}" y="${y+15}" text-anchor="end" font-size="12" font-weight="600" fill="#2D2D2D">${d.label}</text>`;
+      s+=`<rect x="${padL}" y="${y+3}" width="${w-padL-padR}" height="15" rx="6" fill="#EEEAE4"/>`;
+      s+=`<rect x="${padL}" y="${y+3}" width="${Math.max(2,bw)}" height="15" rx="6" fill="${color}"/>`;
+      s+=`<text x="${padL+Math.max(2,bw)+8}" y="${y+15}" font-size="11.5" font-weight="700" fill="#6a6a6a">${fmtVal(d.value)}</text>`;});
+    return s+'</svg>';
+  }
+  html += '<div class="sec">Comparativos por unidade</div><div class="g2">'
+    + '<div class="panel"><h3>Uso do app por unidade</h3>'+barChart('percUtilizamApp', v=>pct(v), '#8B5CF6')+'</div>'
+    + '<div class="panel"><h3>Treinos vencidos por unidade</h3>'+barChart('totalTreinosVencidos', v=>fmt(v), '#D64545')+'</div>'
+    + '</div>';
 
-  const cols = [['nome','Unidade'],['totalAlunos','Alunos'],['percUtilizamApp','Uso app'],['treinosExecutados','Execuções'],
+  const cols = [['nome','Unidade'],['totalAlunos','Alunos'],['percUtilizamApp','Uso app'],
     ['totalTreinosEmDia','Em dia'],['totalTreinosVencidos','Vencidos'],['avaliacoesRealizadas','Aval. feitas'],
     ['avaliacoesAtrasadas','Aval. vencidas'],['acompanhamentoEm','Acompanh.']];
   let rows = U.map(u=>`<tr>
     <td><b>${u.nome}</b></td>
     <td>${fmt(u.totalAlunos)}</td>
     <td>${pct(u.percUtilizamApp)}</td>
-    <td>${fmt(u.treinosExecutados)}</td>
     <td>${fmt(u.totalTreinosEmDia)}</td>
     <td><span class="chip ${(Number(u.totalTreinosVencidos)||0)>0?'c-red':'c-green'}">${fmt(u.totalTreinosVencidos)}</span></td>
     <td>${fmt(u.avaliacoesRealizadas)}</td>
@@ -115,7 +121,7 @@ window.DATA = /*__DATA__*/null;
   html += '<div class="sec">Comparativo por unidade</div><div class="tbl"><div class="scroll"><table><thead><tr>'
     + cols.map(c=>`<th>${c[1]}</th>`).join('') + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
 
-  html += '<div class="note"><b>Cobertura atual (fase 1):</b> 7 dos 8 indicadores vêm ao vivo do BI Treino da Pacto, agregados por unidade. A <b>nota do treino (KPI 7)</b> e o detalhe por aluno/professor (CRM 360º) entram na fase 2.</div>';
+  html += '<div class="note"><b>Cobertura:</b> indicadores ao vivo do BI Treino/Avaliação da Pacto, agregados por unidade. <b>Treinos realizados</b> foi retirado (não é alimentado de forma recorrente pelos alunos). A <b>nota do treino</b> depende de um endpoint da Pacto atualmente em erro. O detalhe por aluno/professor (CRM 360º) entra na fase 2.</div>';
 
   app.innerHTML = html;
 })();
