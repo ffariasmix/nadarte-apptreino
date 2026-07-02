@@ -4,13 +4,13 @@
 
 """
 
-probe_treino.py (v3.1) — confirma a ESTRUTURA real dos endpoints de BI Treino.
+probe_treino.py (v4 FINAL) — confirma avaliacao-fisica-bi (KPI4/5) e avaliacao-treino (KPI7).
 
-empresaId = 1 (a ApiKey ja escopa a unidade). PII-safe: so status/chaves/contagens.
+empresaId=1. PII-safe.
 
 """
 
-import os, sys, json, urllib.request, urllib.error, urllib.parse
+import os, sys, json, urllib.request, urllib.error
 
 BASE = "https://apigw.pactosolucoes.com.br"
 
@@ -56,7 +56,7 @@ def shape(body):
 
             inner = " ->" + d(x["content"], depth + 1) if ("content" in x and depth == 0) else ""
 
-            return "obj{%s}%s" % (", ".join(list(x.keys())[:25]), inner)
+            return "obj{%s}%s" % (", ".join(list(x.keys())[:30]), inner)
 
         if isinstance(x, list):
 
@@ -68,7 +68,7 @@ def shape(body):
 
 def line(st, name, body):
 
-    print("%5s  %-46s  %s" % (st, name, shape(body)[:260]), file=sys.stderr)
+    print("%5s  %-40s  %s" % (st, name, shape(body)[:300]), file=sys.stderr)
 
 def main():
 
@@ -84,83 +84,21 @@ def main():
 
         print("sem chave", file=sys.stderr); sys.exit(1)
 
-    st, body = get(key, "/clientes/simples?page=0&size=3")
+    di, df = 1704067200000, 1798761600000  # 2024-01 .. 2026-12 (janela ampla)
 
-    line(st, "clientes/simples", body)
+    # KPI 4/5 — Avaliacao Fisica BI (dataInicio/dataFim + empresaId)
 
-    cid = mat = empresa = None
+    st, body = get(key, "/psec/avaliacao-fisica-bi?dataInicio=%d&dataFim=%d" % (di, df))
 
-    try:
+    line(st, "avaliacao-fisica-bi (KPI4/5)", body)
 
-        c = (json.loads(body).get("content") or [])[0]
+    # KPI 7 — nota do treino: tipoBusca 0=todas; e por estrela (1..5) p/ distribuicao (NPS)
 
-        cid, mat, empresa = c.get("codigoCliente"), c.get("matricula"), c.get("empresa")
+    for tb in [0, 5, 4, 3, 2, 1]:
 
-        print("  empresa(nome)=%s (cid/mat omitidos)" % empresa, file=sys.stderr)
+        st, body = get(key, "/psec/treino-bi/avaliacao-treino/%d/1?professorId=1&size=3" % tb)
 
-    except Exception:
-
-        pass
-
-    emp = 1  # empresaId (header e path) e SEMPRE 1 — a ApiKey ja escopa a unidade
-
-    cp = None
-
-    if mat is not None:
-
-        st, body = get(key, "/clientes/%s/dados-pessoais" % mat)
-
-        line(st, "clientes/{matricula}/dados-pessoais", body)
-
-        try:
-
-            cp = json.loads(body).get("content", {}).get("codigoPessoa")
-
-        except Exception:
-
-            pass
-
-    filtros = urllib.parse.quote(json.dumps({"dataInicio": 1704067200000, "dataFim": 1735689599000}))
-
-    cfg = urllib.parse.quote(json.dumps({"incluirProfessorInativo": False}))
-
-    st, body = get(key, "/psec/professores/indicadores-atividade/alunos?filters=%s&configs=%s&page=1" % (filtros, cfg))
-
-    line(st, "professores/indicadores-atividade/alunos", body)
-
-    P = cp if cp is not None else 1
-
-    testes = [
-
-        ("treino-bi/dados?idProfessor=1", "/psec/treino-bi/dados?idProfessor=1"),
-
-        ("treino-bi/resumo-execucoes-periodo/1", "/psec/treino-bi/resumo-execucoes-periodo/1"),
-
-        ("treino-bi/alunos-acessos", "/psec/treino-bi/alunos-acessos"),
-
-        ("treino-bi/contagem-treinos-aprovar", "/psec/treino-bi/contagem-treinos-aprovar"),
-
-        ("treino-bi/gerados-executados", "/psec/treino-bi/gerados-executados"),
-
-        ("treino-bi/carteira", "/psec/treino-bi/carteira"),
-
-        ("treino-bi/avaliacao-treino/1/{cp}", "/psec/treino-bi/avaliacao-treino/1/%s" % P),
-
-        ("treino-bi/alunos-treino-vencido/{cp}", "/psec/treino-bi/alunos-treino-vencido/%s" % P),
-
-        ("treino-bi/alunos-treino-em-dia/{cp}", "/psec/treino-bi/alunos-treino-em-dia/%s" % P),
-
-        ("treino-bi/alunos-em-acompanhamento/{cp}", "/psec/treino-bi/alunos-em-acompanhamento/%s" % P),
-
-    ]
-
-    print("\n%5s  %-46s  %s" % ("STAT", "ENDPOINT", "CAMPOS/RESPOSTA"), file=sys.stderr)
-
-    for nome, path in testes:
-
-        st, body = get(key, path, empresa=emp)
-
-        line(st, nome, body)
+        line(st, "avaliacao-treino tipoBusca=%d" % tb, body)
 
 if __name__ == "__main__":
 
