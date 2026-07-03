@@ -1,49 +1,41 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""probe v8 (fase2 professores) — indicadores POR PROFESSOR. PII-safe."""
-import os, sys, json, datetime, urllib.request, urllib.error
-BASE = "https://apigw.pactosolucoes.com.br"
-KEYS = ["PACTO_KEY_716NORTE","PACTO_KEY_905SUL","PACTO_KEY_604NORTE","PACTO_KEY_LAGONORTE","PACTO_KEY_LAGOSUL","PACTO_KEY_NATAL"]
-
-def get(key, path, timeout=25):
+"""probe v9 — campos internos de bi-professores-vinculos (por professor). PII-safe: so caminhos de chave, sem valores."""
+import os, sys, json, urllib.request, urllib.error
+BASE="https://apigw.pactosolucoes.com.br"
+KEYS=["PACTO_KEY_716NORTE","PACTO_KEY_905SUL","PACTO_KEY_604NORTE","PACTO_KEY_LAGONORTE","PACTO_KEY_LAGOSUL","PACTO_KEY_NATAL"]
+def get(key,path,timeout=25):
     h={"Authorization":"Bearer "+key,"Accept":"application/json","empresaId":"1"}
     try:
         with urllib.request.urlopen(urllib.request.Request(BASE+path,headers=h),timeout=timeout) as r:
-            return r.status, r.read().decode("utf-8","replace")
+            return r.status,r.read().decode("utf-8","replace")
     except urllib.error.HTTPError as e: return e.code,(e.read().decode("utf-8","replace") if e.fp else "")
     except Exception as ex: return -1,str(ex)[:80]
-
-def shape(body):
-    try: j=json.loads(body)
-    except Exception: return "(nao-JSON %d)"%len(body)
-    def d(x,dep=0):
-        if isinstance(x,dict):
-            inner=" ->"+d(x["content"],dep+1) if ("content" in x and dep==0) else ""
-            return "obj{%s}%s"%(", ".join(list(x.keys())[:22]),inner)
-        if isinstance(x,list): return "lista[%d]%s"%(len(x),(" item0="+d(x[0],dep+1) if x else ""))
-        return type(x).__name__
-    return d(j)
-
+def paths(x,pre="",out=None):
+    if out is None: out=[]
+    if isinstance(x,dict):
+        for k,v in x.items(): paths(v,pre+k+".",out)
+    elif isinstance(x,list):
+        if x: paths(x[0],pre+"[].",out)
+    else:
+        out.append(pre[:-1])
+    return out
+def item0(body):
+    try:
+        c=json.loads(body).get("content",{})
+        it=c[0] if isinstance(c,list) and c else c
+        return " | ".join(paths(it)[:60])
+    except Exception: return "(erro)"
 def main():
     key=None
     for k in KEYS:
         if os.environ.get(k): key=os.environ[k]; break
-    if not key: print("sem chave",file=sys.stderr); sys.exit(1)
-    now=datetime.datetime.utcnow(); df=int(now.timestamp()*1000); di=int((now-datetime.timedelta(days=365)).timestamp()*1000)
-    dts="dataInicio=%d&dataFim=%d"%(di,df)
-    testes=[
-        ("indic-carteira-professores", "/psec/professores/indicadores-carteira-professores"),
-        ("indic-carteira-professores?dts", "/psec/professores/indicadores-carteira-professores?%s"%dts),
-        ("indic-atividade", "/psec/professores/indicadores-atividade"),
-        ("indic-atividade?dts", "/psec/professores/indicadores-atividade?%s"%dts),
+    for nome,p in [
+        ("bi-professores-vinculos", "/psec/colaboradores/bi-professores-vinculos"),
+        ("professores-ativos", "/colaboradores/professores-ativos"),
         ("indic-atividades-acumuladas", "/psec/professores/indicadores-atividades-acumuladas"),
-        ("ranking/podium", "/psec/professores/ranking/podium"),
-        ("colab/professores-ativos", "/colaboradores/professores-ativos"),
-        ("colab/bi-professores-vinculos", "/psec/colaboradores/bi-professores-vinculos"),
-        ("colab/all-simple", "/psec/colaboradores/all-simple?page=0&size=5"),
-    ]
-    for nome,path in testes:
-        st,body=get(key,path)
-        print("%5s  %-34s  %s"%(st,nome,shape(body)[:300]),file=sys.stderr)
-
+    ]:
+        st,body=get(key,p)
+        print("== %s (%s) ==" % (nome,st), file=sys.stderr)
+        print("   "+item0(body), file=sys.stderr)
 if __name__=="__main__": main()
