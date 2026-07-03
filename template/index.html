@@ -146,6 +146,33 @@ window.DATA = /*__DATA__*/null;
     let ly=34; segs.forEach(seg=>{s+=`<rect x="195" y="${ly}" width="12" height="12" rx="3" fill="${seg.color}"/><text x="214" y="${ly+11}" font-size="12.5" fill="#2D2D2D">${seg.label}</text><text x="320" y="${ly+11}" font-size="12.5" font-weight="700" text-anchor="end" fill="#6a6a6a">${fmt(seg.value)}</text>`; ly+=30;});
     return s+'</svg>';
   }
+  function lineChart(pts, keys){
+    const w=560,h=180,padL=30,padB=22,padT=12,padR=12,xs=pts.length;
+    let allv=[]; pts.forEach(p=>keys.forEach(k=>allv.push(p[k.k])));
+    const max=Math.max(...allv,100), min=Math.min(...allv,0);
+    const X=i=>padL+(w-padL-padR)*(xs<2?0.5:i/(xs-1)), Y=v=>padT+(h-padT-padB)*(1-(v-min)/(max-min||1));
+    let s=`<svg viewBox="0 0 ${w} ${h}" width="100%">`;
+    [0,.5,1].forEach(g=>{const y=padT+(h-padT-padB)*g; s+=`<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="#EEEAE4"/>`;});
+    const step=Math.max(1,Math.ceil(xs/8));
+    pts.forEach((p,i)=>{ if(i%step===0) s+=`<text x="${X(i)}" y="${h-6}" text-anchor="middle" font-size="9.5" fill="#8A8A8A">${String(p.d).slice(8)}/${String(p.d).slice(5,7)}</text>`;});
+    keys.forEach(k=>{ let d=''; pts.forEach((p,i)=>d+=(i?'L':'M')+X(i)+' '+Y(p[k.k])+' ');
+      s+=`<path d="${d}" fill="none" stroke="${k.c}" stroke-width="2.5" stroke-linejoin="round"/>`;
+      pts.forEach((p,i)=>s+=`<circle cx="${X(i)}" cy="${Y(p[k.k])}" r="3" fill="${k.c}"/>`);});
+    s+='</svg>';
+    return s+'<div style="margin-top:4px">'+keys.map(k=>`<span style="font-size:12px;color:#6a6a6a;margin-right:14px"><b style="color:${k.c}">■</b> ${k.n}</span>`).join('')+'</div>';
+  }
+  function histPanel(){
+    const H=(D.historico||[]);
+    const pts=H.map(s=>{ let uso,emdia;
+      if(state.unit==='all'){ uso=N(s.rede&&s.rede.usoApp); emdia=N(s.rede&&s.rede.emDiaPct); }
+      else { const u=(s.unidades||[]).find(x=>x.id===state.unit)||{}; uso=N(u.usoApp); emdia=N(u.emDiaPct); }
+      return {d:s.data, uso, emdia}; });
+    if(pts.length<2)
+      return '<div class="sec">Evolução (histórico)</div><div class="empty" style="margin-top:0">Acumulando histórico — '+pts.length+' dia(s) coletado(s). A curva aparece a partir do 2º dia de publicação.</div>';
+    return '<div class="sec">Evolução (histórico real)</div><div class="panel"><h3>Uso do app e fichas em dia</h3><p class="sub">acumulado das coletas diárias'
+      +(state.unit==='all'?' · rede':' · '+uName(state.unit))+'</p>'
+      +lineChart(pts,[{k:'uso',n:'Uso do app (%)',c:'#8B5CF6'},{k:'emdia',n:'Fichas em dia (%)',c:'#5BAD6F'}])+'</div>';
+  }
 
   function renderGeral(){
     const totAl=sum('totalAlunos');
@@ -169,6 +196,7 @@ window.DATA = /*__DATA__*/null;
     h+='</div>';
     h+='<div class="sec">Treinos vencidos por unidade</div><div class="panel">'
        +hbars(ALL.map(u=>({label:u.nome,value:N(u.totalTreinosVencidos)})),'#D64545',v=>fmt(v))+'</div>';
+    h+=histPanel();
     h+='<div class="note"><b>Cobertura:</b> indicadores ao vivo do BI Treino/Avaliação da Pacto, agregados por unidade. "Treinos realizados" foi retirado (não é alimentado pelos alunos); "nota do treino" depende de um endpoint da Pacto em erro. Detalhe por professor na aba <b>Professores 360º</b> e por aluno na aba <b>CRM 360º</b>.</div>';
     document.getElementById('v-geral').innerHTML=h;
   }
