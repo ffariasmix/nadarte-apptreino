@@ -1,0 +1,53 @@
+[
+ {
+  "data": "2026-07-03",
+  "rede": {
+   "usoApp": 34.6,
+   "emDiaPct": 66.1,
+   "vencidos": 651,
+   "avalVencidas": 348,
+   "ativos": 16481,
+   "engajado": 156,
+   "morno": 16105,
+   "risco": 220
+  },
+  "unidades": [
+   {
+    "id": "604Norte",
+    "nome": "604 Norte",
+    "usoApp": 42.2,
+    "emDiaPct": 58.0
+   },
+   {
+    "id": "716Norte",
+    "nome": "716 Norte",
+    "usoApp": 0.0,
+    "emDiaPct": 0.0
+   },
+   {
+    "id": "905Sul",
+    "nome": "905 Sul",
+    "usoApp": 35.6,
+    "emDiaPct": 73.0
+   },
+   {
+    "id": "LagoNorte",
+    "nome": "Lago Norte",
+    "usoApp": 34.4,
+    "emDiaPct": 50.0
+   },
+   {
+    "id": "LagoSul",
+    "nome": "Lago Sul",
+    "usoApp": 15.0,
+    "emDiaPct": 82.0
+   },
+   {
+    "id": "Natal",
+    "nome": "Natal/RN",
+    "usoApp": 58.2,
+    "emDiaPct": 50.0
+   }
+  ]
+ }
+]
