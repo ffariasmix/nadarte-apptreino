@@ -48,7 +48,7 @@ def main():
         eng = sum(1 for a in alunos if a.get("faixa") == "engajado")
         mor = sum(1 for a in alunos if a.get("faixa") == "morno")
         ris = sum(1 for a in alunos if a.get("faixa") == "risco")
-        print("\nCRM por aluno: %d elegiveis (engajado %d · morno %d · risco %d) em %d professores"
+        print("\nCRM por aluno: %d ativos (engajado %d · morno %d · risco %d) em %d professores"
               % (len(alunos), eng, mor, ris, len(data.get("professores", []))), file=sys.stderr)
     if check:
         return

@@ -109,6 +109,18 @@ def parse_date_ms(v):
     except Exception:
         return None
 
+# tokens que marcam cliente NAO-ativo (situacao / situacaoContrato)
+INATIVO_TOK = ("INATIV","CANCEL","DESIST","TRANC","BLOQ","EXCLU","EXPIR","SUSPEN","DESLIG","TESTE")
+
+def ativo(it):
+    """Aluno da base ATIVA: nao-inativo E contrato vigente (ou vencido ha <=30d).
+    Corrige o fato de /clientes/simples devolver toda a base historica."""
+    blob = strip_accents(str(it.get("situacao") or "") + " " + str(it.get("situacaoContrato") or "")).upper()
+    if any(t in blob for t in INATIVO_TOK):
+        return False
+    fim = parse_date_ms(it.get("fimContrato"))
+    return (fim is None) or (fim >= NOW_MS - 30 * 86400000)
+
 def classifica(usa_app, fim_ms):
     """1a) uso do app + contrato. dias = quanto falta para o fim do contrato."""
     dias = (fim_ms - NOW_MS) / 86400000.0 if fim_ms else None
@@ -193,28 +205,37 @@ def coleta_unidade(uk, ulabel, key):
                 "tempoMedio": num(tp, "medio") if isinstance(tp, dict) else None,
             })
 
-    # ---- CRM por aluno ----
+    # ---- CRM por aluno (SO BASE ATIVA) ----
     carteira = fetch_carteira(key, ulabel)
-    cat_dist = {}
-    elegiveis = []
+    cat_dist, sit_dist = {}, {}
+    ativos = []
     for it in carteira:
         cat = str(it.get("categoria") or "").strip() or "(sem categoria)"
         cat_dist[cat] = cat_dist.get(cat, 0) + 1
-        if elegivel(it.get("categoria")):
-            elegiveis.append(it)
+        sit = str(it.get("situacao") or "").strip() or "(sem situacao)"
+        sit_dist[sit] = sit_dist.get(sit, 0) + 1
+        if ativo(it):
+            ativos.append(it)
+    bi_total = num(dados, "totalAlunos")
+    CAP = 4000  # teto de seguranca p/ nao estourar tempo se o filtro falhar
+    if len(ativos) > CAP:
+        print("  [aviso] %s: %d ativos > teto %d — limitando (revisar filtro)" % (ulabel, len(ativos), CAP), file=sys.stderr)
+        ativos = ativos[:CAP]
+    print("  [ativos] %s: %d ativos (carteira %d | BI diz %s)" % (
+        ulabel, len(ativos), len(carteira), "-" if bi_total is None else str(int(bi_total))), file=sys.stderr)
 
-    # uso do app (concorrente) apenas para elegiveis
+    # uso do app (concorrente) apenas para ativos
     def _app(it):
         cid = it.get("codigoCliente") or it.get("matricula")
         return cid, usa_app(key, cid)
     app_map = {}
-    if elegiveis:
-        with ThreadPoolExecutor(max_workers=8) as ex:
-            for cid, v in ex.map(_app, elegiveis):
+    if ativos:
+        with ThreadPoolExecutor(max_workers=10) as ex:
+            for cid, v in ex.map(_app, ativos):
                 app_map[cid] = v
 
     alunos = []
-    for it in elegiveis:
+    for it in ativos:
         cid = it.get("codigoCliente") or it.get("matricula")
         fim_ms = parse_date_ms(it.get("fimContrato"))
         ua = app_map.get(cid)
@@ -238,7 +259,7 @@ def coleta_unidade(uk, ulabel, key):
 
     resumo = {
         "carteiraTotal": len(carteira),
-        "elegiveis": len(elegiveis),
+        "ativos": len(ativos),
         "appSim": sum(1 for a in alunos if a["usaApp"] is True),
         "appNao": sum(1 for a in alunos if a["usaApp"] is False),
         "engajado": sum(1 for a in alunos if a["faixa"] == "engajado"),
@@ -271,7 +292,7 @@ def coleta_unidade(uk, ulabel, key):
         "avaliacoesSem": num(avf, "semAvaliacao"),
         "crm": resumo,
     }
-    return {"unit": unidade, "profs": profs, "alunos": alunos, "cat_dist": cat_dist}
+    return {"unit": unidade, "profs": profs, "alunos": alunos, "cat_dist": cat_dist, "sit_dist": sit_dist}
 
 # ---------------------------------------------------------------- main
 def main():
@@ -290,7 +311,7 @@ def main():
 
     os.makedirs("data", exist_ok=True)
     unidades, professores, alunos = [], [], []
-    cat_total = {}
+    cat_total, sit_total = {}, {}
     for k in sorted(resultados):
         r = resultados[k]
         unidades.append(r["unit"])
@@ -298,6 +319,8 @@ def main():
         alunos.extend(r.get("alunos", []))
         for cat, n in r.get("cat_dist", {}).items():
             cat_total[cat] = cat_total.get(cat, 0) + n
+        for sit, n in r.get("sit_dist", {}).items():
+            sit_total[sit] = sit_total.get(sit, 0) + n
 
     out = {"gerado_em": NOW.isoformat() + "Z",
            "unidades": unidades, "professores": professores,
@@ -305,10 +328,13 @@ def main():
     with open("data/treino.json", "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
 
-    print("OK -> data/treino.json (%d unidades, %d professores, %d alunos elegiveis)"
+    print("OK -> data/treino.json (%d unidades, %d professores, %d alunos ATIVOS)"
           % (len(unidades), len(professores), len(alunos)), file=sys.stderr)
-    print("[categorias] distribuicao na base ativa (para conferir o corte elegivel):", file=sys.stderr)
-    for cat, n in sorted(cat_total.items(), key=lambda x: -x[1]):
+    print("[situacao] distribuicao na base (para conferir o filtro de ativos):", file=sys.stderr)
+    for sit, n in sorted(sit_total.items(), key=lambda x: -x[1])[:12]:
+        print("    %6d  %s" % (n, sit), file=sys.stderr)
+    print("[categorias] distribuicao (campo categoria — hoje vazio nesta base):", file=sys.stderr)
+    for cat, n in sorted(cat_total.items(), key=lambda x: -x[1])[:8]:
         print("    %6d  %s" % (n, cat), file=sys.stderr)
 
 if __name__ == "__main__":
