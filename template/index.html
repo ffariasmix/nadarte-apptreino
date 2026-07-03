@@ -7,14 +7,22 @@
 <style>
   :root{--bg:#F5F4F1;--card:#fff;--ink:#2D2D2D;--orange:#E8521A;--green:#5BAD6F;--amber:#F0A500;
     --red:#D64545;--blue:#3E7CB1;--muted:#8A8A8A;--line:#EAE7E2;--soft:#FAF8F5;
-    --shadow:0 1px 3px rgba(0,0,0,.06),0 6px 18px rgba(0,0,0,.05)}
+    --shadow:0 1px 3px rgba(0,0,0,.06),0 6px 18px rgba(0,0,0,.05);
+    /* escala tipografica (padrao unico do front) */
+    --fs-metric:28px;  /* numero grande (KPI) */
+    --fs-title:19px;   /* titulo de pagina */
+    --fs-card:15px;    /* titulo de card/painel */
+    --fs-body:13.5px;  /* texto corrido / tabela */
+    --fs-eyebrow:12.5px;/* rotulo de secao (uppercase) */
+    --fs-caption:12px; /* legenda / subtexto */
+    --fs-label:11px;   /* micro-rotulo (KPI, thead) */}
   *{box-sizing:border-box}html,body{margin:0}body{background:var(--bg);color:var(--ink);
     font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:14px;line-height:1.45}
   .wrap{max-width:1240px;margin:0 auto;padding:0 20px}
   header{background:linear-gradient(180deg,#fff,#fdfcfb);border-bottom:1px solid var(--line)}
   .hd{display:flex;align-items:center;gap:16px;padding:15px 0;flex-wrap:wrap}
   img.logo{height:42px;width:auto;display:block;flex:0 0 auto}
-  .htxt h1{margin:0;font-size:18px;font-weight:800;letter-spacing:-.3px}
+  .htxt h1{margin:0;font-size:var(--fs-title);font-weight:800;letter-spacing:-.3px}
   .htxt p{margin:2px 0 0;color:var(--muted);font-size:12.5px}
   .asof{margin-left:auto;color:var(--muted);font-size:12px;white-space:nowrap;display:flex;align-items:center;gap:10px}
   .live{display:inline-flex;align-items:center;gap:6px;background:#E7F4EB;color:#3f8a52;font-weight:700;font-size:11.5px;padding:5px 11px;border-radius:999px}
@@ -30,29 +38,30 @@
   .tab:hover{color:var(--ink)}.tab.on{color:var(--orange);border-bottom-color:var(--orange)}
   main{padding:22px 0 60px}.view{display:none}.view.on{display:block;animation:fade .25s ease}
   @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-  .sec{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:26px 0 12px}
+  .sec{font-size:var(--fs-eyebrow);font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:26px 0 12px}
   .sec:first-child{margin-top:0}
   .kgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
   .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
-  .kpi .n{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;display:flex;align-items:center;gap:7px}
+  .kpi .n{font-size:var(--fs-label);font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;display:flex;align-items:center;gap:7px}
   .kpi .dot{width:9px;height:9px;border-radius:3px}
-  .kpi .v{font-size:26px;font-weight:800;letter-spacing:-.6px;margin:9px 0 2px;line-height:1}
-  .kpi .s{font-size:12px;color:var(--muted)}
+  .kpi .v{font-size:var(--fs-metric);font-weight:800;letter-spacing:-.6px;margin:9px 0 2px;line-height:1}
+  .kpi .s{font-size:var(--fs-caption);color:var(--muted)}
   .g2{display:grid;grid-template-columns:1.2fr 1fr;gap:16px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}  /* graficos em 2x2 no desktop */
   .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
-  .panel h3{margin:0 0 4px;font-size:14.5px;font-weight:800}.panel .sub{color:var(--muted);font-size:12px;margin:0 0 14px}
+  .panel h3{margin:0 0 4px;font-size:var(--fs-card);font-weight:800}.panel .sub{color:var(--muted);font-size:var(--fs-caption);margin:0 0 14px}
   .ugrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
   .ucard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow)}
   .ucard .un{font-weight:800;font-size:15px}.ucard .ual{color:var(--muted);font-size:12px;margin-top:1px}
   .ucard .urow{display:flex;justify-content:space-between;font-size:12.5px;margin-top:9px;padding-top:9px;border-top:1px dashed var(--line)}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);font-weight:700;padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  table{width:100%;border-collapse:collapse;font-size:var(--fs-body)}
+  th{text-align:left;font-size:var(--fs-label);text-transform:uppercase;letter-spacing:.3px;color:var(--muted);font-weight:700;padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}
   td{padding:11px 10px;border-bottom:1px solid var(--line)}tr:last-child td{border:none}
   .tbl{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}.scroll{overflow-x:auto}
   .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px}
   .c-red{background:#FBE8E8;color:#b53434}.c-amber{background:#FDF3DC;color:#a97c00}.c-green{background:#E7F4EB;color:#3f8a52}
   .bar{height:7px;border-radius:5px;background:#EEEAE4;overflow:hidden;min-width:70px;flex:1}.bar>i{display:block;height:100%;border-radius:5px}
-  .note{background:#FFF8F1;border:1px solid #f6d3bd;border-radius:11px;padding:14px 16px;font-size:12.5px;color:#7a4a2a;margin-top:14px}
+  .note{background:#FFF8F1;border:1px solid #f6d3bd;border-radius:11px;padding:14px 16px;font-size:var(--fs-caption);color:#7a4a2a;margin-top:14px}
   .meth{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;box-shadow:var(--shadow);margin-bottom:16px}
   .meth h3{margin:0 0 3px;font-size:16px;font-weight:800}.meth .sub{color:var(--muted);font-size:12.5px;margin:0 0 16px}
   .map th{background:var(--soft)}.map code{background:var(--soft);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:11.5px;font-family:ui-monospace,Menlo,monospace;color:#c7420f}
@@ -72,7 +81,7 @@
   .pbtn{background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer;font-family:inherit}
   .pbtn:disabled{opacity:.4;cursor:default}
   .stack{display:flex;height:12px;border-radius:6px;overflow:hidden;margin-top:6px}
-  @media(max-width:900px){.kgrid{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}.ugrid{grid-template-columns:1fr}.road{grid-template-columns:1fr}}
+  @media(max-width:900px){.kgrid{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}.ugrid{grid-template-columns:1fr}.road{grid-template-columns:1fr}}
   @media(max-width:460px){.kgrid{grid-template-columns:1fr}.asof{margin-left:0;width:100%}}
 </style>
 </head>
@@ -167,11 +176,10 @@ window.DATA = /*__DATA__*/null;
       if(state.unit==='all'){ uso=N(s.rede&&s.rede.usoApp); emdia=N(s.rede&&s.rede.emDiaPct); }
       else { const u=(s.unidades||[]).find(x=>x.id===state.unit)||{}; uso=N(u.usoApp); emdia=N(u.emDiaPct); }
       return {d:s.data, uso, emdia}; });
+    const title='<h3>Evolução — uso do app e fichas em dia</h3><p class="sub">'+(state.unit==='all'?'rede':uName(state.unit))+' · acumula com as coletas diárias</p>';
     if(pts.length<2)
-      return '<div class="sec">Evolução (histórico)</div><div class="empty" style="margin-top:0">Acumulando histórico — '+pts.length+' dia(s) coletado(s). A curva aparece a partir do 2º dia de publicação.</div>';
-    return '<div class="sec">Evolução (histórico real)</div><div class="panel"><h3>Uso do app e fichas em dia</h3><p class="sub">acumulado das coletas diárias'
-      +(state.unit==='all'?' · rede':' · '+uName(state.unit))+'</p>'
-      +lineChart(pts,[{k:'uso',n:'Uso do app (%)',c:'#8B5CF6'},{k:'emdia',n:'Fichas em dia (%)',c:'#5BAD6F'}])+'</div>';
+      return '<div class="panel">'+title+'<div class="empty" style="border:none;padding:22px 6px">Acumulando histórico — '+pts.length+' dia(s). A curva aparece a partir do 2º dia.</div></div>';
+    return '<div class="panel">'+title+lineChart(pts,[{k:'uso',n:'Uso do app (%)',c:'#8B5CF6'},{k:'emdia',n:'Fichas em dia (%)',c:'#5BAD6F'}])+'</div>';
   }
 
   function renderGeral(){
@@ -188,15 +196,15 @@ window.DATA = /*__DATA__*/null;
     ];
     let h='<div class="sec">'+(state.unit==='all'?'Panorama da rede':'Unidade: '+uName(state.unit))+'</div><div class="kgrid">';
     h+=K.map(c=>`<div class="kpi"><div class="n"><span class="dot" style="background:${c.dot}"></span>${c.n}</div><div class="v">${c.v}</div><div class="s">${c.s}</div></div>`).join('')+'</div>';
-    h+='<div class="sec">Gráficos</div><div class="g2">';
+    h+='<div class="sec">Gráficos</div><div class="grid2">';
     h+='<div class="panel"><h3>Uso do app por unidade</h3><p class="sub">% de alunos que usam o App Treino</p>'
        +hbars(ALL.map(u=>({label:u.nome,value:N(u.percUtilizamApp)})),'#8B5CF6',v=>pct(v))+'</div>';
     h+='<div class="panel"><h3>Situação das fichas</h3><p class="sub">na seleção atual</p>'
        +donut([{label:'Em dia',value:sum('totalTreinosEmDia'),color:'#5BAD6F'},{label:'Vencidas',value:sum('totalTreinosVencidos'),color:'#D64545'},{label:'A renovar',value:sum('totalTreinosRenovar'),color:'#F0A500'}])+'</div>';
-    h+='</div>';
-    h+='<div class="sec">Treinos vencidos por unidade</div><div class="panel">'
+    h+='<div class="panel"><h3>Treinos vencidos por unidade</h3><p class="sub">fichas a renovar</p>'
        +hbars(ALL.map(u=>({label:u.nome,value:N(u.totalTreinosVencidos)})),'#D64545',v=>fmt(v))+'</div>';
     h+=histPanel();
+    h+='</div>';
     h+='<div class="note"><b>Cobertura:</b> indicadores ao vivo do BI Treino/Avaliação da Pacto, agregados por unidade. "Treinos realizados" foi retirado (não é alimentado pelos alunos); "nota do treino" depende de um endpoint da Pacto em erro. Detalhe por professor na aba <b>Professores 360º</b> e por aluno na aba <b>CRM 360º</b>.</div>';
     document.getElementById('v-geral').innerHTML=h;
   }
