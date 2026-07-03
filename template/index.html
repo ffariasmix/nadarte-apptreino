@@ -77,6 +77,7 @@
   <div class="tabs" id="tabs">
     <button class="tab on" data-v="geral">Visão Geral</button>
     <button class="tab" data-v="unidades">Unidades</button>
+    <button class="tab" data-v="profs">Professores 360º</button>
     <button class="tab" data-v="fase2">Fase 2 (roadmap)</button>
     <button class="tab" data-v="metodo">Metodologia &amp; API</button>
   </div>
@@ -84,6 +85,7 @@
 <main class="wrap">
   <section class="view on" id="v-geral"></section>
   <section class="view" id="v-unidades"></section>
+  <section class="view" id="v-profs"></section>
   <section class="view" id="v-fase2"></section>
   <section class="view" id="v-metodo"></section>
 </main>
@@ -182,7 +184,7 @@ window.DATA = /*__DATA__*/null;
       <div class="sec">Roadmap — o que entra a seguir</div>
       <div class="road">
         <div class="roadcard"><div class="t">CRM 360º por aluno</div><div class="d">Lista de alunos com ficha, avaliação, uso do app, índice de engajamento e ação sugerida. Fonte: feed <code>indicadores-atividade/alunos</code>.</div><div class="badge">requer PII / acesso restrito</div></div>
-        <div class="roadcard"><div class="t">Professores 360º</div><div class="d">Índice de acompanhamento por professor, ranking e evolução. Fonte: <code>dados?idProfessor={id}</code> por professor + lista de professores.</div><div class="badge">fase 2</div></div>
+        <div class="roadcard"><div class="t">Professores 360º</div><div class="d">Ranking de atuação por professor (carteira, fichas em dia/vencidas, % em dia, índice). Fonte: <code>bi-professores-vinculos</code>.</div><div class="badge" style="background:#E7F4EB;color:#3f8a52">✓ no ar</div></div>
         <div class="roadcard"><div class="t">Nota do treino (NPS)</div><div class="d">Avaliação que os alunos dão ao treino (1–5) e NPS. Endpoint <code>avaliacao-treino</code> retornando 500 — depende de correção na Pacto.</div><div class="badge">bloqueado (Pacto)</div></div>
         <div class="roadcard"><div class="t">Índice de engajamento</div><div class="d">Score 0–100 por aluno (uso do app, ficha em dia, avaliação, feedback) com faixas Engajado/Morno/Em risco.</div><div class="badge">depende do CRM por aluno</div></div>
         <div class="roadcard"><div class="t">Corte Público-Alvo</div><div class="d">Filtrar elegíveis ao app (Fitness + Ambos) via campo <code>categoria</code>, excluindo Água/Lutas do denominador.</div><div class="badge">fase 2</div></div>
@@ -211,11 +213,40 @@ window.DATA = /*__DATA__*/null;
       </div>`;
   }
 
+  function renderProfs(){
+    let P=(D.professores||[]).slice();
+    if(state.unit!=='all') P=P.filter(p=>p.unit===state.unit);
+    P=P.map(p=>{const tot=N(p.comTreino)+N(p.semTreino); const cob=tot>0?N(p.comTreino)/tot:0;
+      return Object.assign({},p,{indice:Math.round(0.7*N(p.pctEmDia)+0.3*cob*100)});});
+    P.sort((a,b)=>b.indice-a.indice);
+    const el=document.getElementById('v-profs');
+    if(!P.length){ el.innerHTML='<div class="empty" style="margin-top:20px">Sem professores com vínculo de treino nesta seleção.</div>'; return; }
+    const medal=r=>r===0?'🥇':r===1?'🥈':r===2?'🥉':(r+1)+'º';
+    const col=v=>v>=70?'#3f8a52':v>=45?'#a97c00':'#b53434'; const bg=v=>v>=70?'#E7F4EB':v>=45?'#FDF3DC':'#FBE8E8';
+    const n=P.length, medEmDia=Math.round(P.reduce((a,p)=>a+N(p.pctEmDia),0)/n), venc=P.reduce((a,p)=>a+N(p.vencidos),0);
+    let h='<div class="sec">Professores 360º — '+(state.unit==='all'?'rede':uName(state.unit))+' ('+fmt(n)+' professores)</div>';
+    h+='<div class="kgrid" style="grid-template-columns:repeat(3,1fr)">'
+      +`<div class="kpi"><div class="n"><span class="dot" style="background:#0EA5A0"></span>Professores</div><div class="v">${fmt(n)}</div><div class="s">com vínculo de treino</div></div>`
+      +`<div class="kpi"><div class="n"><span class="dot" style="background:#5BAD6F"></span>% ficha em dia (média)</div><div class="v">${pct(medEmDia)}</div><div class="s">média entre professores</div></div>`
+      +`<div class="kpi"><div class="n"><span class="dot" style="background:#D64545"></span>Alunos com treino vencido</div><div class="v">${fmt(venc)}</div><div class="s">somados nas carteiras</div></div>`
+      +'</div>';
+    h+='<div class="sec">Ranking de atuação <span style="font-weight:600;color:#8A8A8A;font-size:12px">— por índice</span></div><div class="tbl"><div class="scroll"><table><thead><tr>'
+      +'<th>#</th><th>Professor</th><th>Unidade</th><th>Alunos c/ treino</th><th>Em dia</th><th>Vencidos</th><th>% em dia</th><th>Tempo médio</th><th>Índice</th></tr></thead><tbody>';
+    h+=P.map((p,i)=>`<tr><td style="font-size:15px">${medal(i)}</td><td><b>${p.nome||('Prof '+(p.id||''))}</b></td><td>${uName(p.unit)}</td>
+      <td>${fmt(p.comTreino)}</td><td>${fmt(p.emDia)}</td>
+      <td><span class="pill ${N(p.vencidos)>0?'c-red':'c-green'}">${fmt(p.vencidos)}</span></td>
+      <td>${pct(p.pctEmDia)}</td><td>${p.tempoMedio!=null?fmt(p.tempoMedio)+' d':'—'}</td>
+      <td><span class="pill" style="background:${bg(p.indice)};color:${col(p.indice)}">${p.indice}</span></td></tr>`).join('');
+    h+='</tbody></table></div></div>';
+    h+='<div class="note"><b>Índice de atuação</b> = 70% do "% de fichas em dia" + 30% da cobertura (alunos com treino ÷ carteira). Faixas: Referência ≥ 70 · Regular 45–69 · Atenção &lt; 45. Fonte: <code>bi-professores-vinculos</code> (um chamado por unidade). Página com login — por isso pode exibir o nome do professor.</div>';
+    el.innerHTML=h;
+  }
+
   // filtros + abas
   function renderChips(){
     const chips=[{id:'all',nome:'Todas as unidades'}].concat(ALL.map(u=>({id:u.id,nome:u.nome})));
     document.getElementById('unitChips').innerHTML='<span class="flab">Unidade</span>'+chips.map(c=>`<button class="chip ${state.unit===c.id?'on':''}" data-u="${c.id}">${c.nome}</button>`).join('');
-    document.querySelectorAll('#unitChips .chip').forEach(b=>b.onclick=()=>{state.unit=b.dataset.u; renderChips(); renderGeral();});
+    document.querySelectorAll('#unitChips .chip').forEach(b=>b.onclick=()=>{state.unit=b.dataset.u; renderChips(); renderGeral(); renderProfs();});
   }
   document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
     state.tab=t.dataset.v;
@@ -223,7 +254,7 @@ window.DATA = /*__DATA__*/null;
     document.querySelectorAll('.view').forEach(s=>s.classList.remove('on'));
     document.getElementById('v-'+state.tab).classList.add('on');
   });
-  renderChips(); renderGeral(); renderUnidades(); renderFase2(); renderMetodo();
+  renderChips(); renderGeral(); renderUnidades(); renderProfs(); renderFase2(); renderMetodo();
 })();
 </script>
 </body>

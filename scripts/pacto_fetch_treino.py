@@ -75,7 +75,28 @@ def coleta_unidade(uk, ulabel, key):
     aprov = content(key, "/psec/treino-bi/contagem-treinos-aprovar")
     avf   = content(key, "/psec/avaliacao-fisica-bi?dataInicio=%d&dataFim=%d" % (di, df))
 
-    return {
+    # Professores 360: um chamado -> lista de professores com indicadores de treino
+    profs = []
+    raw = content(key, "/psec/colaboradores/bi-professores-vinculos")
+    if isinstance(raw, list):
+        for p in raw:
+            pr = p.get("professor", {}) or {}
+            bi = p.get("biTreinoTreinamentoDTO", {}) or {}
+            tp = bi.get("tempoPermanenciaPrograma") or {}
+            profs.append({
+                "unit": uk, "unitNome": ulabel,
+                "id": pr.get("id"), "nome": pr.get("nome"),
+                "comTreino": num(bi, "alunosAtivosComTreino"),
+                "semTreino": num(bi, "alunosAtivosSemTreino"),
+                "emDia": num(bi, "alunosAtivosProgramaEmDia"),
+                "vencidos": num(bi, "alunosProgramaVencidos"),
+                "renovar": num(bi, "alunosProgramaRenovar"),
+                "pctEmDia": num(bi, "porcentagemTreinosEmDia"),
+                "renovar30": num(bi, "treinosRenovarEm30Dias"),
+                "tempoMedio": num(tp, "medio") if isinstance(tp, dict) else None,
+            })
+
+    unidade = {
         "id": uk, "nome": ulabel,
         "totalAlunos": num(dados, "totalAlunos"),
         "totalAlunosAtivos": num(dados, "totalAlunosAtivos"),
@@ -99,6 +120,7 @@ def coleta_unidade(uk, ulabel, key):
         "avaliacoesPrevistas": num(avf, "previstas"),
         "avaliacoesSem": num(avf, "semAvaliacao"),
     }
+    return {"unit": unidade, "profs": profs}
 
 def main():
     resultados = {}
@@ -114,11 +136,16 @@ def main():
     with ThreadPoolExecutor(max_workers=len(UNITS)) as ex:
         list(ex.map(run, UNITS))
     os.makedirs("data", exist_ok=True)
+    unidades, professores = [], []
+    for k in sorted(resultados):
+        r = resultados[k]
+        unidades.append(r["unit"])
+        professores.extend(r.get("profs", []))
     out = {"gerado_em": datetime.datetime.utcnow().isoformat() + "Z",
-           "unidades": [resultados[k] for k in sorted(resultados)]}
+           "unidades": unidades, "professores": professores}
     with open("data/treino.json", "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
-    print("OK -> data/treino.json (%d unidades)" % len(out["unidades"]), file=sys.stderr)
+    print("OK -> data/treino.json (%d unidades, %d professores)" % (len(unidades), len(professores)), file=sys.stderr)
 
 if __name__ == "__main__":
     main()
