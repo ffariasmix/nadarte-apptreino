@@ -27,6 +27,10 @@ UNITS = [
 NOW = datetime.datetime.utcnow()
 NOW_MS = int(NOW.timestamp() * 1000)
 
+# modo diagnostico: pula o alunoApp (coleta rapida) e so mede as distribuicoes
+_d = (os.environ.get("PACTO_DIAG") or "").strip().lower()
+DIAG = _d not in ("", "false", "0", "no")
+
 # ---------------------------------------------------------------- HTTP
 def http_get(key, path, tries=4, timeout=35):
     for i in range(tries):
@@ -180,6 +184,13 @@ def coleta_unidade(uk, ulabel, key):
     di = int((NOW - datetime.timedelta(days=365)).timestamp() * 1000)
 
     dados = content(key, "/psec/treino-bi/dados?idProfessor=0")  # 0 = TOTAL da unidade
+    # guarda: se a unidade voltar vazia/zerada (falha transitoria), tenta de novo
+    for _try in range(3):
+        if num(dados, "totalAlunos"):
+            break
+        time.sleep(2 + _try)
+        print("  [retry] %s: BI dados veio vazio, tentando de novo (%d)" % (ulabel, _try + 1), file=sys.stderr)
+        dados = content(key, "/psec/treino-bi/dados?idProfessor=0")
     cart  = content(key, "/psec/treino-bi/carteira")
     aprov = content(key, "/psec/treino-bi/contagem-treinos-aprovar")
     avf   = content(key, "/psec/avaliacao-fisica-bi?dataInicio=%d&dataFim=%d" % (di, df))
@@ -207,13 +218,15 @@ def coleta_unidade(uk, ulabel, key):
 
     # ---- CRM por aluno (SO BASE ATIVA) ----
     carteira = fetch_carteira(key, ulabel)
-    cat_dist, sit_dist = {}, {}
+    cat_dist, sit_dist, sitc_dist = {}, {}, {}
     ativos = []
     for it in carteira:
         cat = str(it.get("categoria") or "").strip() or "(sem categoria)"
         cat_dist[cat] = cat_dist.get(cat, 0) + 1
         sit = str(it.get("situacao") or "").strip() or "(sem situacao)"
         sit_dist[sit] = sit_dist.get(sit, 0) + 1
+        sc = str(it.get("situacaoContrato") or "").strip() or "(sem situacaoContrato)"
+        sitc_dist[sc] = sitc_dist.get(sc, 0) + 1
         if ativo(it):
             ativos.append(it)
     bi_total = num(dados, "totalAlunos")
@@ -224,12 +237,12 @@ def coleta_unidade(uk, ulabel, key):
     print("  [ativos] %s: %d ativos (carteira %d | BI diz %s)" % (
         ulabel, len(ativos), len(carteira), "-" if bi_total is None else str(int(bi_total))), file=sys.stderr)
 
-    # uso do app (concorrente) apenas para ativos
+    # uso do app (concorrente) apenas para ativos — PULADO em modo diagnostico
     def _app(it):
         cid = it.get("codigoCliente") or it.get("matricula")
         return cid, usa_app(key, cid)
     app_map = {}
-    if ativos:
+    if ativos and not DIAG:
         with ThreadPoolExecutor(max_workers=10) as ex:
             for cid, v in ex.map(_app, ativos):
                 app_map[cid] = v
@@ -292,7 +305,9 @@ def coleta_unidade(uk, ulabel, key):
         "avaliacoesSem": num(avf, "semAvaliacao"),
         "crm": resumo,
     }
-    return {"unit": unidade, "profs": profs, "alunos": alunos, "cat_dist": cat_dist, "sit_dist": sit_dist}
+    return {"unit": unidade, "profs": profs, "alunos": alunos,
+            "cat_dist": cat_dist, "sit_dist": sit_dist, "sitc_dist": sitc_dist,
+            "carteiraTotal": len(carteira), "ativosHeur": len(ativos), "biTotal": bi_total}
 
 # ---------------------------------------------------------------- main
 def main():
@@ -311,22 +326,41 @@ def main():
 
     os.makedirs("data", exist_ok=True)
     unidades, professores, alunos = [], [], []
-    cat_total, sit_total = {}, {}
+    cat_total, sit_total, sitc_total = {}, {}, {}
+    carteira_total = ativos_total = 0
     for k in sorted(resultados):
         r = resultados[k]
         unidades.append(r["unit"])
         professores.extend(r.get("profs", []))
         alunos.extend(r.get("alunos", []))
+        carteira_total += r.get("carteiraTotal", 0)
+        ativos_total += r.get("ativosHeur", 0)
         for cat, n in r.get("cat_dist", {}).items():
             cat_total[cat] = cat_total.get(cat, 0) + n
         for sit, n in r.get("sit_dist", {}).items():
             sit_total[sit] = sit_total.get(sit, 0) + n
+        for sc, n in r.get("sitc_dist", {}).items():
+            sitc_total[sc] = sitc_total.get(sc, 0) + n
 
     out = {"gerado_em": NOW.isoformat() + "Z",
            "unidades": unidades, "professores": professores,
            "alunos": alunos, "categorias": cat_total}
     with open("data/treino.json", "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
+
+    # diagnostico (agregado, SEM PII) — versionado no repo para inspecionar sem depender do log
+    os.makedirs("history", exist_ok=True)
+    diag = {"gerado_em": NOW.isoformat() + "Z", "diagMode": DIAG,
+            "carteiraTotal": carteira_total, "ativosHeuristica": ativos_total,
+            "biTotalPorUnidade": {r_["unit"]["nome"]: r_["unit"].get("totalAlunos")
+                                  for r_ in resultados.values()},
+            "situacao": dict(sorted(sit_total.items(), key=lambda x: -x[1])),
+            "situacaoContrato": dict(sorted(sitc_total.items(), key=lambda x: -x[1])),
+            "categoria": dict(sorted(cat_total.items(), key=lambda x: -x[1])[:15])}
+    with open("history/diag.json", "w", encoding="utf-8") as f:
+        json.dump(diag, f, ensure_ascii=False, indent=1)
+    print("[diag] -> history/diag.json (carteira %d | ativos-heuristica %d | DIAG=%s)"
+          % (carteira_total, ativos_total, DIAG), file=sys.stderr)
 
     print("OK -> data/treino.json (%d unidades, %d professores, %d alunos ATIVOS)"
           % (len(unidades), len(professores), len(alunos)), file=sys.stderr)
