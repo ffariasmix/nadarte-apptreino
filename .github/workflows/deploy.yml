@@ -14,6 +14,9 @@ concurrency:
   group: apptreino-build
   cancel-in-progress: false
 
+permissions:
+  contents: write   # necessario para salvar history/serie.json de volta no repo
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -45,3 +48,15 @@ jobs:
         run: |
           npm i -g wrangler
           wrangler pages deploy public --project-name=nadarte-apptreino --branch=main
+
+      - name: Salvar historico (agregado, sem PII) no repo
+        # so nas publicacoes (cron diario ou run manual com deploy=true)
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.deploy == true) }}
+        run: |
+          if [ -f history/serie.json ]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add history/serie.json
+            git commit -m "hist: snapshot diario" || echo "sem mudancas no historico"
+            git push || echo "nada a enviar"
+          fi
