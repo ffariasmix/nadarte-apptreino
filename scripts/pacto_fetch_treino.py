@@ -213,7 +213,7 @@ def coleta_unidade(uk, ulabel, key):
                 "tempoMedio": num(tp, "medio") if isinstance(tp, dict) else None,
             })
 
-    # ---- CRM por aluno (SO BASE ATIVA) ----
+    # ---- Carteira ativa (o uso do app roda DEPOIS, em fila global controlada) ----
     carteira = fetch_carteira(key, ulabel)
     cat_dist, sit_dist, sitc_dist = {}, {}, {}
     ativos = []
@@ -233,49 +233,6 @@ def coleta_unidade(uk, ulabel, key):
         ativos = ativos[:CAP]
     print("  [ativos] %s: %d ativos (carteira %d | BI diz %s)" % (
         ulabel, len(ativos), len(carteira), "-" if bi_total is None else str(int(bi_total))), file=sys.stderr)
-
-    # uso do app (concorrente) apenas para ativos — PULADO em modo diagnostico
-    def _app(it):
-        cid = it.get("codigoCliente") or it.get("matricula")
-        return cid, usa_app(key, cid)
-    app_map = {}
-    if ativos and not DIAG:
-        with ThreadPoolExecutor(max_workers=10) as ex:
-            for cid, v in ex.map(_app, ativos):
-                app_map[cid] = v
-
-    alunos = []
-    for it in ativos:
-        cid = it.get("codigoCliente") or it.get("matricula")
-        fim_ms = parse_date_ms(it.get("fimContrato"))
-        ua = app_map.get(cid)
-        faixa = classifica(bool(ua), fim_ms)
-        alunos.append({
-            "unit": uk, "unitNome": ulabel,
-            "nome": it.get("nome"),
-            "matricula": it.get("matricula"),
-            "foto": it.get("urlFoto"),
-            "categoria": it.get("categoria"),
-            "situacao": it.get("situacao"),
-            "situacaoContrato": it.get("situacaoContrato"),
-            "inicioContrato": parse_date_ms(it.get("inicioContrato")),
-            "fimContrato": fim_ms,
-            "diasContrato": round((fim_ms - NOW_MS) / 86400000.0) if fim_ms else None,
-            "telefone": it.get("telefone"),
-            "email": it.get("email"),
-            "usaApp": ua,
-            "faixa": faixa,
-        })
-
-    resumo = {
-        "carteiraTotal": len(carteira),
-        "ativos": len(ativos),
-        "appSim": sum(1 for a in alunos if a["usaApp"] is True),
-        "appNao": sum(1 for a in alunos if a["usaApp"] is False),
-        "engajado": sum(1 for a in alunos if a["faixa"] == "engajado"),
-        "morno":    sum(1 for a in alunos if a["faixa"] == "morno"),
-        "risco":    sum(1 for a in alunos if a["faixa"] == "risco"),
-    }
 
     unidade = {
         "id": uk, "nome": ulabel,
@@ -300,26 +257,89 @@ def coleta_unidade(uk, ulabel, key):
         "avaliacoesReavaliacoes": num(avf, "reavaliacoes"),
         "avaliacoesPrevistas": num(avf, "previstas"),
         "avaliacoesSem": num(avf, "semAvaliacao"),
-        "crm": resumo,
     }
-    return {"unit": unidade, "profs": profs, "alunos": alunos,
+    return {"uk": uk, "ulabel": ulabel, "unit": unidade, "profs": profs, "ativos": ativos,
             "cat_dist": cat_dist, "sit_dist": sit_dist, "sitc_dist": sitc_dist,
-            "carteiraTotal": len(carteira), "ativosHeur": len(ativos), "biTotal": bi_total}
+            "carteiraTotal": len(carteira), "biTotal": bi_total}
 
 # ---------------------------------------------------------------- main
 def main():
     resultados = {}
+    keys = {}
+    # ---- FASE 1: agregados por unidade + carteira (paralelo entre unidades) ----
     def run(u):
         uk, ulabel, env = u
         key = os.environ.get(env)
         if not key:
             print("[skip] %s: sem %s" % (ulabel, env), file=sys.stderr); return
+        keys[uk] = key
         try:
             resultados[uk] = coleta_unidade(uk, ulabel, key)
         except Exception as ex:
             print("[erro] %s: %s" % (ulabel, ex), file=sys.stderr)
     with ThreadPoolExecutor(max_workers=len(UNITS)) as ex:
         list(ex.map(run, UNITS))
+
+    # ---- FASE 2: uso do app numa FILA GLOBAL (concorrencia limitada -> sem rate limit) ----
+    tarefas = []  # (uk, key, cid)
+    for uk in sorted(resultados):
+        key = keys.get(uk)
+        for it in resultados[uk].get("ativos", []):
+            cid = it.get("codigoCliente") or it.get("matricula")
+            tarefas.append((uk, key, cid))
+    app_res = {}  # (uk, cid) -> True / False / None(falha)
+    n_true = n_false = n_fail = 0
+    if tarefas and not DIAG:
+        def _one(t):
+            uk, key, cid = t
+            return (uk, cid, usa_app(key, cid))
+        with ThreadPoolExecutor(max_workers=6) as ex:   # <= gentil com a API
+            for uk, cid, v in ex.map(_one, tarefas):
+                app_res[(uk, cid)] = v
+        # 2a tentativa (sequencial e leve) so para os que falharam
+        faltas = [(uk, key, cid) for (uk, key, cid) in tarefas if app_res.get((uk, cid)) is None]
+        if faltas:
+            print("  [app] re-tentando %d chamadas que falharam..." % len(faltas), file=sys.stderr)
+            for uk, key, cid in faltas:
+                time.sleep(0.12)
+                app_res[(uk, cid)] = usa_app(key, cid)
+        for v in app_res.values():
+            n_true  += 1 if v is True else 0
+            n_false += 1 if v is False else 0
+            n_fail  += 1 if v is None else 0
+        print("[app] usaApp -> sim %d | nao %d | falha %d (de %d ativos)"
+              % (n_true, n_false, n_fail, len(tarefas)), file=sys.stderr)
+
+    # ---- FASE 3: montar alunos + resumo por unidade ----
+    for uk in sorted(resultados):
+        r = resultados[uk]
+        u_alunos = []
+        for it in r.get("ativos", []):
+            cid = it.get("codigoCliente") or it.get("matricula")
+            fim_ms = parse_date_ms(it.get("fimContrato"))
+            ua = app_res.get((uk, cid))          # True / False / None
+            faixa = classifica(bool(ua), fim_ms) if ua is not None else "semdado"
+            u_alunos.append({
+                "unit": uk, "unitNome": r["ulabel"],
+                "nome": it.get("nome"), "matricula": it.get("matricula"),
+                "foto": it.get("urlFoto"), "categoria": it.get("categoria"),
+                "situacao": it.get("situacao"), "situacaoContrato": it.get("situacaoContrato"),
+                "inicioContrato": parse_date_ms(it.get("inicioContrato")), "fimContrato": fim_ms,
+                "diasContrato": round((fim_ms - NOW_MS) / 86400000.0) if fim_ms else None,
+                "telefone": it.get("telefone"), "email": it.get("email"),
+                "usaApp": ua, "faixa": faixa,
+            })
+        r["alunos"] = u_alunos
+        r["unit"]["crm"] = {
+            "carteiraTotal": r.get("carteiraTotal", 0), "ativos": len(u_alunos),
+            "appSim": sum(1 for a in u_alunos if a["usaApp"] is True),
+            "appNao": sum(1 for a in u_alunos if a["usaApp"] is False),
+            "appFalha": sum(1 for a in u_alunos if a["usaApp"] is None),
+            "engajado": sum(1 for a in u_alunos if a["faixa"] == "engajado"),
+            "morno": sum(1 for a in u_alunos if a["faixa"] == "morno"),
+            "risco": sum(1 for a in u_alunos if a["faixa"] == "risco"),
+            "semdado": sum(1 for a in u_alunos if a["faixa"] == "semdado"),
+        }
 
     os.makedirs("data", exist_ok=True)
     unidades, professores, alunos = [], [], []
@@ -331,7 +351,7 @@ def main():
         professores.extend(r.get("profs", []))
         alunos.extend(r.get("alunos", []))
         carteira_total += r.get("carteiraTotal", 0)
-        ativos_total += r.get("ativosHeur", 0)
+        ativos_total += len(r.get("alunos", []))
         for cat, n in r.get("cat_dist", {}).items():
             cat_total[cat] = cat_total.get(cat, 0) + n
         for sit, n in r.get("sit_dist", {}).items():
@@ -348,7 +368,10 @@ def main():
     # diagnostico (agregado, SEM PII) — versionado no repo para inspecionar sem depender do log
     os.makedirs("history", exist_ok=True)
     diag = {"gerado_em": NOW.isoformat() + "Z", "diagMode": DIAG,
-            "carteiraTotal": carteira_total, "ativosHeuristica": ativos_total,
+            "carteiraTotal": carteira_total, "ativos": ativos_total,
+            "usoApp": {"sim": n_true, "nao": n_false, "falha": n_fail},
+            "faixas": {f: sum(1 for a in alunos if a["faixa"] == f)
+                       for f in ("engajado", "morno", "risco", "semdado")},
             "biTotalPorUnidade": {r_["unit"]["nome"]: r_["unit"].get("totalAlunos")
                                   for r_ in resultados.values()},
             "situacao": dict(sorted(sit_total.items(), key=lambda x: -x[1])),
