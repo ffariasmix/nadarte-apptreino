@@ -62,6 +62,16 @@
   .badge{display:inline-block;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;padding:4px 9px;border-radius:999px;background:#EEF1F6;color:#5a6b86;margin-top:10px}
   footer{border-top:1px solid var(--line);color:var(--muted);font-size:12px;padding:18px 0;text-align:center}
   .empty{background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:40px;text-align:center;color:var(--muted)}
+  .av{width:34px;height:34px;border-radius:50%;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;background:var(--orange);position:relative;overflow:hidden}
+  .avimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .aluno-cell{display:flex;align-items:center;gap:10px}.aluno-cell .nm{font-weight:700}.aluno-cell .ct{font-size:11px;color:var(--muted)}
+  .subf{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:14px 0 4px}
+  .srch{border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:12.5px;font-family:inherit;min-width:180px;flex:1;max-width:280px}
+  .srch:focus{outline:none;border-color:var(--orange)}
+  .pager{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;flex-wrap:wrap;border-top:1px solid var(--line)}
+  .pbtn{background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer;font-family:inherit}
+  .pbtn:disabled{opacity:.4;cursor:default}
+  .stack{display:flex;height:12px;border-radius:6px;overflow:hidden;margin-top:6px}
   @media(max-width:900px){.kgrid{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}.ugrid{grid-template-columns:1fr}.road{grid-template-columns:1fr}}
   @media(max-width:460px){.kgrid{grid-template-columns:1fr}.asof{margin-left:0;width:100%}}
 </style>
@@ -78,6 +88,7 @@
     <button class="tab on" data-v="geral">Visão Geral</button>
     <button class="tab" data-v="unidades">Unidades</button>
     <button class="tab" data-v="profs">Professores 360º</button>
+    <button class="tab" data-v="crm">CRM 360º (alunos)</button>
     <button class="tab" data-v="fase2">Fase 2 (roadmap)</button>
     <button class="tab" data-v="metodo">Metodologia &amp; API</button>
   </div>
@@ -86,6 +97,7 @@
   <section class="view on" id="v-geral"></section>
   <section class="view" id="v-unidades"></section>
   <section class="view" id="v-profs"></section>
+  <section class="view" id="v-crm"></section>
   <section class="view" id="v-fase2"></section>
   <section class="view" id="v-metodo"></section>
 </main>
@@ -106,7 +118,7 @@ window.DATA = /*__DATA__*/null;
   const N = v => Number(v)||0;
   if(D.gerado_em){ try{ document.getElementById('asof').textContent = new Date(D.gerado_em).toLocaleString('pt-BR'); }catch(e){} }
 
-  let state = {unit:'all', tab:'geral'};
+  let state = {unit:'all', tab:'geral', crmFaixa:'all', crmPub:'all', crmQ:'', crmPage:1};
   const sel = () => state.unit==='all' ? ALL : ALL.filter(u=>u.id===state.unit);
   const sum = k => sel().reduce((a,u)=>a+N(u[k]),0);
   const wavg = (k,w) => { let n=0,d=0; sel().forEach(u=>{const ww=N(u[w]); if(u[k]!=null){n+=Number(u[k])*ww; d+=ww;}}); return d?n/d:null; };
@@ -157,7 +169,7 @@ window.DATA = /*__DATA__*/null;
     h+='</div>';
     h+='<div class="sec">Treinos vencidos por unidade</div><div class="panel">'
        +hbars(ALL.map(u=>({label:u.nome,value:N(u.totalTreinosVencidos)})),'#D64545',v=>fmt(v))+'</div>';
-    h+='<div class="note"><b>Cobertura:</b> indicadores ao vivo do BI Treino/Avaliação da Pacto, agregados por unidade. "Treinos realizados" foi retirado (não é alimentado pelos alunos); "nota do treino" depende de um endpoint da Pacto em erro. Detalhe por aluno/professor (CRM 360º) na fase 2 — ver aba <b>Fase 2</b>.</div>';
+    h+='<div class="note"><b>Cobertura:</b> indicadores ao vivo do BI Treino/Avaliação da Pacto, agregados por unidade. "Treinos realizados" foi retirado (não é alimentado pelos alunos); "nota do treino" depende de um endpoint da Pacto em erro. Detalhe por professor na aba <b>Professores 360º</b> e por aluno na aba <b>CRM 360º</b>.</div>';
     document.getElementById('v-geral').innerHTML=h;
   }
   function uName(id){return (ALL.find(u=>u.id===id)||{}).nome||id;}
@@ -183,11 +195,11 @@ window.DATA = /*__DATA__*/null;
     document.getElementById('v-fase2').innerHTML=`
       <div class="sec">Roadmap — o que entra a seguir</div>
       <div class="road">
-        <div class="roadcard"><div class="t">CRM 360º por aluno</div><div class="d">Lista de alunos com ficha, avaliação, uso do app, índice de engajamento e ação sugerida. Fonte: feed <code>indicadores-atividade/alunos</code>.</div><div class="badge">requer PII / acesso restrito</div></div>
+        <div class="roadcard"><div class="t">CRM 360º por aluno</div><div class="d">Carteira ativa elegível com uso do app, contrato e faixa Engajado/Morno/Em risco, por unidade. Fonte: <code>/clientes/simples</code> + <code>/psec/alunos/alunoApp</code>.</div><div class="badge" style="background:#E7F4EB;color:#3f8a52">✓ no ar (aba CRM 360º)</div></div>
         <div class="roadcard"><div class="t">Professores 360º</div><div class="d">Ranking de atuação por professor (carteira, fichas em dia/vencidas, % em dia, índice). Fonte: <code>bi-professores-vinculos</code>.</div><div class="badge" style="background:#E7F4EB;color:#3f8a52">✓ no ar</div></div>
         <div class="roadcard"><div class="t">Nota do treino (NPS)</div><div class="d">Avaliação que os alunos dão ao treino (1–5) e NPS. Endpoint <code>avaliacao-treino</code> retornando 500 — depende de correção na Pacto.</div><div class="badge">bloqueado (Pacto)</div></div>
         <div class="roadcard"><div class="t">Índice de engajamento</div><div class="d">Score 0–100 por aluno (uso do app, ficha em dia, avaliação, feedback) com faixas Engajado/Morno/Em risco.</div><div class="badge">depende do CRM por aluno</div></div>
-        <div class="roadcard"><div class="t">Corte Público-Alvo</div><div class="d">Filtrar elegíveis ao app (Fitness + Ambos) via campo <code>categoria</code>, excluindo Água/Lutas do denominador.</div><div class="badge">fase 2</div></div>
+        <div class="roadcard"><div class="t">Corte Público-Alvo</div><div class="d">Elegíveis ao app (Fitness + Ambos) via campo <code>categoria</code>, excluindo Água/Lutas. Já aplicado na aba CRM 360º (filtro por público-alvo).</div><div class="badge" style="background:#E7F4EB;color:#3f8a52">✓ no CRM 360º</div></div>
         <div class="roadcard"><div class="t">Séries históricas</div><div class="d">Evolução mês a mês dos indicadores por unidade (acumulando as coletas diárias).</div><div class="badge">acumula com o tempo</div></div>
       </div>
       <div class="note">A versão de protótipo (com dados fictícios) mostra como essas telas ficam. Cada item acima é ligado ao vivo conforme destravamos a fonte de dados e a decisão de acesso/PII.</div>`;
@@ -205,11 +217,22 @@ window.DATA = /*__DATA__*/null;
           <tr><td><b>Avaliações realizadas</b></td><td><code>/psec/avaliacao-fisica-bi.realizadas</code></td></tr>
           <tr><td><b>Avaliações vencidas</b></td><td><code>avaliacao-fisica-bi.atrasadas</code></td></tr>
           <tr><td><b>Atendimento</b></td><td><code>/psec/treino-bi/carteira.totalAlunosEmAcompanhamento</code></td></tr>
+          <tr><td><b>Carteira por aluno (CRM)</b></td><td><code>/clientes/simples</code> (nome, categoria, contrato, contato)</td></tr>
+          <tr><td><b>Uso do app por aluno</b></td><td><code>/psec/alunos/alunoApp?cliente=</code> → <code>usaApp</code></td></tr>
         </tbody></table></div>
         <div class="note"><b>Fora do escopo atual:</b> "treinos realizados" (execução) — não é registrado de forma recorrente pelos alunos; "nota do treino" — endpoint <code>avaliacao-treino</code> em erro (500) na Pacto.</div>
       </div>
+      <div class="meth"><h3>Faixa do aluno (CRM 360º)</h3>
+        <p class="sub">Classificação de engajamento no App Treino, com os dados reais hoje disponíveis (uso do app + contrato). O "treino em dia" por aluno depende de um endpoint da Pacto em erro e entra quando corrigido.</p>
+        <div class="scroll"><table class="map"><thead><tr><th>Faixa</th><th>Regra</th></tr></thead><tbody>
+          <tr><td><span class="pill c-green">Engajado</span></td><td>Usa o App Treino <b>e</b> contrato vigente (mais de 30 dias).</td></tr>
+          <tr><td><span class="pill c-amber">Morno</span></td><td>Usa o app mas contrato a vencer (≤30 dias); <b>ou</b> não usa o app mas contrato em dia.</td></tr>
+          <tr><td><span class="pill c-red">Em risco</span></td><td>Não usa o app <b>e</b> contrato a vencer/vencido.</td></tr>
+        </tbody></table></div>
+        <div class="note"><b>Base:</b> carteira ativa elegível (Fitness + Ambos, campo <code>categoria</code>) via <code>/clientes/simples</code>, cruzada com <code>alunoApp.usaApp</code>. Água e Lutas ficam fora do denominador (não usam o App Treino).</div>
+      </div>
       <div class="meth"><h3>Arquitetura</h3>
-        <p class="sub">Robô no GitHub Actions coleta a API (chaves nos Secrets), valida (gate) e publica no Cloudflare Pages. Atualização diária automática. Sem PII na camada pública (só agregados por unidade).</p>
+        <p class="sub">Robô no GitHub Actions coleta a API (chaves nos Secrets), valida (gate) e publica no Cloudflare Pages. Atualização diária automática. Os agregados por unidade não têm PII; o CRM por aluno traz nome e contato e por isso a página fica protegida por login (Cloudflare Access).</p>
       </div>`;
   }
 
@@ -242,11 +265,88 @@ window.DATA = /*__DATA__*/null;
     el.innerHTML=h;
   }
 
+  // ---------- CRM 360º por aluno ----------
+  const esc = s => (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const iniciais = nome => { const p=(nome||'').trim().split(/\s+/).filter(Boolean); return ((p[0]||'?')[0]+(p.length>1?p[p.length-1][0]:'')).toUpperCase(); };
+  const FA = {engajado:['Engajado','c-green'], morno:['Morno','c-amber'], risco:['Em risco','c-red']};
+  function appPill(v){ return v===true?'<span class="pill c-green">Sim</span>':v===false?'<span class="pill c-red">Não</span>':'<span class="pill" style="background:#EEE;color:#999">—</span>'; }
+  function contratoPill(d){ if(d==null) return '<span class="pill c-green">ativo</span>'; if(d<0) return '<span class="pill c-red">vencido</span>'; if(d<=30) return `<span class="pill c-amber">vence em ${d}d</span>`; if(d<=90) return `<span class="pill" style="background:#EEF1F6;color:#5a6b86">${d}d</span>`; return `<span class="pill c-green">${d}d</span>`; }
+  function avatar(a){ const ini=iniciais(a.nome); return a.foto?`<span class="av">${ini}<img class="avimg" src="${esc(a.foto)}" onerror="this.remove()" alt=""></span>`:`<span class="av">${ini}</span>`; }
+
+  const crmBase = () => (D.alunos||[]).filter(a=> state.unit==='all' || a.unit===state.unit);
+  function crmFiltered(){
+    let A=crmBase();
+    if(state.crmFaixa!=='all') A=A.filter(a=>a.faixa===state.crmFaixa);
+    if(state.crmPub!=='all')   A=A.filter(a=>String(a.categoria||'')===state.crmPub);
+    const qq=(state.crmQ||'').trim().toLowerCase();
+    if(qq) A=A.filter(a=>String(a.nome||'').toLowerCase().includes(qq));
+    A.sort((a,b)=>{const o={risco:0,morno:1,engajado:2}; if(o[a.faixa]!==o[b.faixa]) return o[a.faixa]-o[b.faixa]; return (a.diasContrato??1e9)-(b.diasContrato??1e9);});
+    return A;
+  }
+  const PER=40;
+  function renderCRMResults(){
+    const box=document.getElementById('crmResults'); if(!box) return;
+    const A=crmFiltered(); const pages=Math.max(1,Math.ceil(A.length/PER));
+    if(state.crmPage>pages) state.crmPage=pages; if(state.crmPage<1) state.crmPage=1;
+    const start=(state.crmPage-1)*PER, rows=A.slice(start,start+PER);
+    const showUnit = state.unit==='all';
+    let h='<div class="tbl"><div class="scroll"><table><thead><tr><th>Aluno</th>'
+      +(showUnit?'<th>Unidade</th>':'')+'<th>Público-alvo</th><th>Usa o app</th><th>Contrato</th><th>Faixa</th></tr></thead><tbody>';
+    if(!rows.length){ h+=`<tr><td colspan="${showUnit?6:5}"><div class="empty" style="border:none;padding:26px">Nenhum aluno nesta combinação de filtros.</div></td></tr>`; }
+    rows.forEach(a=>{ const f=FA[a.faixa]||['—','']; h+=`<tr>
+      <td><div class="aluno-cell">${avatar(a)}<div><div class="nm">${esc(a.nome)||'—'}</div><div class="ct">${esc(a.email||'')}${a.telefone?(a.email?' · ':'')+esc(a.telefone):''}</div></div></div></td>`
+      +(showUnit?`<td>${esc(a.unitNome)}</td>`:'')
+      +`<td>${esc(a.categoria||'—')}</td><td>${appPill(a.usaApp)}</td><td>${contratoPill(a.diasContrato)}</td>
+      <td><span class="pill ${f[1]}">${f[0]}</span></td></tr>`; });
+    h+='</tbody></table></div>';
+    h+=`<div class="pager"><span style="color:#8A8A8A;font-size:12.5px">${fmt(A.length)} aluno(s) · página ${state.crmPage} de ${pages}</span>
+      <span style="display:flex;gap:8px"><button class="pbtn" data-p="prev" ${state.crmPage<=1?'disabled':''}>‹ Anterior</button>
+      <button class="pbtn" data-p="next" ${state.crmPage>=pages?'disabled':''}>Próxima ›</button></span></div></div>`;
+    box.innerHTML=h;
+    box.querySelectorAll('.pbtn').forEach(b=>b.onclick=()=>{ state.crmPage+=(b.dataset.p==='next'?1:-1); renderCRMResults(); window.scrollTo({top:0,behavior:'smooth'}); });
+  }
+  function renderCRM(){
+    const el=document.getElementById('v-crm');
+    if(!D.alunos || !D.alunos.length){ el.innerHTML='<div class="empty" style="margin-top:20px"><b>CRM por aluno disponível após a próxima coleta.</b><br>Rode o workflow "Coleta + Publica" com deploy=true para popular a carteira.</div>'; return; }
+    const B=crmBase();
+    const nApp=B.filter(a=>a.usaApp===true).length;
+    const ne=B.filter(a=>a.faixa==='engajado').length, nm=B.filter(a=>a.faixa==='morno').length, nr=B.filter(a=>a.faixa==='risco').length;
+    const tot=B.length||1;
+    let h='<div class="sec">CRM 360º por aluno — '+(state.unit==='all'?'rede':uName(state.unit))+'</div>';
+    h+='<div class="kgrid">'
+      +`<div class="kpi"><div class="n"><span class="dot" style="background:#2D2D2D"></span>Alunos elegíveis</div><div class="v">${fmt(B.length)}</div><div class="s">Fitness + Ambos (usam o App Treino)</div></div>`
+      +`<div class="kpi"><div class="n"><span class="dot" style="background:#8B5CF6"></span>Usam o app</div><div class="v">${pct(nApp/tot*100)}</div><div class="s">${fmt(nApp)} de ${fmt(B.length)} alunos</div></div>`
+      +`<div class="kpi"><div class="n"><span class="dot" style="background:#5BAD6F"></span>Engajados</div><div class="v">${fmt(ne)}</div><div class="s">usam o app + contrato ok</div></div>`
+      +`<div class="kpi"><div class="n"><span class="dot" style="background:#D64545"></span>Em risco</div><div class="v">${fmt(nr)}</div><div class="s">não usam o app + contrato vencendo</div></div>`
+      +'</div>';
+    h+='<div class="panel" style="margin-top:14px"><h3>Distribuição por faixa</h3><p class="sub">na seleção atual — clique nos filtros abaixo para detalhar</p>'
+      +`<div class="stack"><i style="width:${ne/tot*100}%;background:#5BAD6F"></i><i style="width:${nm/tot*100}%;background:#F0A500"></i><i style="width:${nr/tot*100}%;background:#D64545"></i></div>`
+      +`<div style="display:flex;gap:16px;margin-top:8px;font-size:12px;color:#6a6a6a;flex-wrap:wrap">
+        <span><b style="color:#3f8a52">■</b> Engajado ${fmt(ne)}</span><span><b style="color:#a97c00">■</b> Morno ${fmt(nm)}</span><span><b style="color:#b53434">■</b> Em risco ${fmt(nr)}</span></div></div>`;
+    // filtro faixa
+    const faixas=[['all','Todos'],['engajado','Engajado'],['morno','Morno'],['risco','Em risco']];
+    h+='<div class="subf"><span class="flab">Faixa</span>'+faixas.map(f=>`<button class="chip cf ${state.crmFaixa===f[0]?'on':''}" data-f="${f[0]}">${f[1]}</button>`).join('')+'</div>';
+    // filtro publico-alvo (categorias distintas na base)
+    const pubs=Array.from(new Set(B.map(a=>String(a.categoria||'').trim()).filter(Boolean))).sort();
+    if(pubs.length>1){ h+='<div class="subf"><span class="flab">Público-alvo</span>'
+      +[['all','Todos']].concat(pubs.map(p=>[p,p])).map(p=>`<button class="chip cp ${state.crmPub===p[0]?'on':''}" data-p="${esc(p[0])}">${esc(p[1])}</button>`).join('')+'</div>'; }
+    // busca
+    h+='<div class="subf"><span class="flab">Buscar</span><input class="srch" id="crmSearch" type="text" placeholder="nome do aluno…" value="'+esc(state.crmQ||'')+'"></div>';
+    h+='<div id="crmResults" style="margin-top:12px"></div>';
+    h+='<div class="note"><b>Como lemos a faixa (dados reais disponíveis):</b> <b>Engajado</b> = usa o App Treino e contrato vigente; <b>Morno</b> = usa o app mas contrato a vencer, ou não usa mas contrato ok; <b>Em risco</b> = não usa o app e contrato vencendo/vencido. Base: carteira ativa elegível (Fitness+Ambos) via <code>/clientes/simples</code> + uso do app via <code>/psec/alunos/alunoApp</code>. O "treino em dia" por aluno depende de um endpoint da Pacto em erro (500) — entra quando a Pacto corrigir.</div>';
+    el.innerHTML=h;
+    el.querySelectorAll('.chip.cf').forEach(b=>b.onclick=()=>{ state.crmFaixa=b.dataset.f; state.crmPage=1; renderCRM(); });
+    el.querySelectorAll('.chip.cp').forEach(b=>b.onclick=()=>{ state.crmPub=b.dataset.p; state.crmPage=1; renderCRM(); });
+    const sb=document.getElementById('crmSearch');
+    if(sb){ sb.oninput=()=>{ state.crmQ=sb.value; state.crmPage=1; renderCRMResults(); }; }
+    renderCRMResults();
+  }
+
   // filtros + abas
   function renderChips(){
     const chips=[{id:'all',nome:'Todas as unidades'}].concat(ALL.map(u=>({id:u.id,nome:u.nome})));
     document.getElementById('unitChips').innerHTML='<span class="flab">Unidade</span>'+chips.map(c=>`<button class="chip ${state.unit===c.id?'on':''}" data-u="${c.id}">${c.nome}</button>`).join('');
-    document.querySelectorAll('#unitChips .chip').forEach(b=>b.onclick=()=>{state.unit=b.dataset.u; renderChips(); renderGeral(); renderProfs();});
+    document.querySelectorAll('#unitChips .chip').forEach(b=>b.onclick=()=>{state.unit=b.dataset.u; state.crmPage=1; renderChips(); renderGeral(); renderProfs(); renderCRM();});
   }
   document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
     state.tab=t.dataset.v;
@@ -254,7 +354,7 @@ window.DATA = /*__DATA__*/null;
     document.querySelectorAll('.view').forEach(s=>s.classList.remove('on'));
     document.getElementById('v-'+state.tab).classList.add('on');
   });
-  renderChips(); renderGeral(); renderUnidades(); renderProfs(); renderFase2(); renderMetodo();
+  renderChips(); renderGeral(); renderUnidades(); renderProfs(); renderCRM(); renderFase2(); renderMetodo();
 })();
 </script>
 </body>
