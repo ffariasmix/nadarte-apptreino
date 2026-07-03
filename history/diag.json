@@ -1,0 +1,35 @@
+{
+ "gerado_em": "2026-07-03T20:46:57.737151Z",
+ "diagMode": true,
+ "carteiraTotal": 81317,
+ "ativosHeuristica": 20714,
+ "biTotalPorUnidade": {
+  "Lago Norte": 576.0,
+  "Lago Sul": 421.0,
+  "Natal/RN": 173.0,
+  "905 Sul": 1274.0,
+  "604 Norte": 411.0,
+  "716 Norte": 659.0
+ },
+ "situacao": {
+  "INATIVO": 49044,
+  "VISITANTE": 27605,
+  "ATIVO": 4520,
+  "TRANCADO": 148
+ },
+ "situacaoContrato": {
+  "DESISTENTE": 39693,
+  "(sem situacaoContrato)": 27768,
+  "CANCELADO": 9207,
+  "NORMAL": 4211,
+  "A_VENCER": 253,
+  "INATIVO_VENCIDO": 127,
+  "ATESTADO": 51,
+  "FERIAS": 6,
+  "TRANCADO_VENCIDO": 1
+ },
+ "categoria": {
+  "(sem categoria)": 81313,
+  "TESTE PACTO": 4
+ }
+}
