@@ -7,6 +7,10 @@ on:
         description: "Publicar no Cloudflare? (false = so validar)"
         type: boolean
         default: false
+      diag:
+        description: "Modo diagnostico? (rapido, sem uso-do-app; grava history/diag.json)"
+        type: boolean
+        default: false
   schedule:
     - cron: "0 6 * * *"
 
@@ -34,6 +38,7 @@ jobs:
           PACTO_KEY_LAGONORTE: ${{ secrets.PACTO_KEY_LAGONORTE }}
           PACTO_KEY_LAGOSUL:   ${{ secrets.PACTO_KEY_LAGOSUL }}
           PACTO_KEY_NATAL:     ${{ secrets.PACTO_KEY_NATAL }}
+          PACTO_DIAG: ${{ inputs.diag }}
         run: python scripts/pacto_fetch_treino.py
 
       - name: Montar + GATE (nao publica se o dado nao fechar)
@@ -48,6 +53,17 @@ jobs:
         run: |
           npm i -g wrangler
           wrangler pages deploy public --project-name=nadarte-apptreino --branch=main
+
+      - name: Salvar diagnostico (modo diag) no repo
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.diag == true }}
+        run: |
+          if [ -f history/diag.json ]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add history/diag.json
+            git commit -m "diag: distribuicao de situacao" || echo "sem mudancas no diag"
+            git push || echo "nada a enviar"
+          fi
 
       - name: Salvar historico (agregado, sem PII) no repo
         # so nas publicacoes (cron diario ou run manual com deploy=true)
