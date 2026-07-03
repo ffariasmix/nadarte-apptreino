@@ -5,12 +5,54 @@ build_treino.py — GATE + injeta os dados reais no template -> public/index.htm
 Uso: python scripts/build_treino.py        (valida e gera public/)
      python scripts/build_treino.py --check (so valida)
 """
-import os, sys, json
+import os, sys, json, datetime
 
 RAW = "data/treino.json"
 TEMPLATE = "template/index.html"
 OUT_DIR = "public"
+HIST = "history/serie.json"   # historico AGREGADO por dia (sem PII) — versionado no repo
 MARKER = "/*__DATA__*/null"
+
+def num(v):
+    try: return float(v)
+    except Exception: return 0.0
+
+def snapshot(data):
+    """Monta o snapshot AGREGADO de hoje (sem PII) para a serie historica."""
+    unis = data.get("unidades", [])
+    tot = sum(num(u.get("totalAlunos")) for u in unis) or 1
+    usoApp = sum(num(u.get("percUtilizamApp")) * num(u.get("totalAlunos")) for u in unis) / tot
+    emDia = sum(num(u.get("percentualEmDia")) * num(u.get("totalAlunos")) for u in unis) / tot
+    al = data.get("alunos", [])
+    faixa = lambda f: sum(1 for a in al if a.get("faixa") == f)
+    return {
+        "data": datetime.date.today().isoformat(),
+        "rede": {
+            "usoApp": round(usoApp, 1), "emDiaPct": round(emDia, 1),
+            "vencidos": int(sum(num(u.get("totalTreinosVencidos")) for u in unis)),
+            "avalVencidas": int(sum(num(u.get("avaliacoesAtrasadas")) for u in unis)),
+            "ativos": len(al), "engajado": faixa("engajado"), "morno": faixa("morno"), "risco": faixa("risco"),
+        },
+        "unidades": [{"id": u.get("id"), "nome": u.get("nome"),
+                      "usoApp": round(num(u.get("percUtilizamApp")), 1),
+                      "emDiaPct": round(num(u.get("percentualEmDia")), 1)} for u in unis],
+    }
+
+def atualiza_historico(data):
+    """Le history/serie.json, faz upsert do dia de hoje, salva e devolve a serie (cap 365 dias)."""
+    hist = []
+    if os.path.exists(HIST):
+        try: hist = json.load(open(HIST, encoding="utf-8"))
+        except Exception: hist = []
+    snap = snapshot(data)
+    hist = [h for h in hist if h.get("data") != snap["data"]]  # substitui se ja houver hoje
+    hist.append(snap)
+    hist.sort(key=lambda h: h.get("data", ""))
+    hist = hist[-365:]
+    os.makedirs(os.path.dirname(HIST), exist_ok=True)
+    json.dump(hist, open(HIST, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    print("[historico] %d dia(s) acumulado(s) -> %s" % (len(hist), HIST), file=sys.stderr)
+    return hist
 
 def gate(data):
     problemas = []
@@ -52,6 +94,8 @@ def main():
               % (len(alunos), eng, mor, ris, len(data.get("professores", []))), file=sys.stderr)
     if check:
         return
+    # acumula a serie historica (agregada, sem PII) e injeta junto
+    data["historico"] = atualiza_historico(data)
     tpl = open(TEMPLATE, encoding="utf-8").read()
     if MARKER not in tpl:
         print("ERRO: marcador %r nao esta no template." % MARKER, file=sys.stderr); sys.exit(4)
