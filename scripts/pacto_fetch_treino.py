@@ -117,13 +117,10 @@ def parse_date_ms(v):
 INATIVO_TOK = ("INATIV","CANCEL","DESIST","TRANC","BLOQ","EXCLU","EXPIR","SUSPEN","DESLIG","TESTE")
 
 def ativo(it):
-    """Aluno da base ATIVA: nao-inativo E contrato vigente (ou vencido ha <=30d).
-    Corrige o fato de /clientes/simples devolver toda a base historica."""
-    blob = strip_accents(str(it.get("situacao") or "") + " " + str(it.get("situacaoContrato") or "")).upper()
-    if any(t in blob for t in INATIVO_TOK):
-        return False
-    fim = parse_date_ms(it.get("fimContrato"))
-    return (fim is None) or (fim >= NOW_MS - 30 * 86400000)
+    """Base ATIVA = situacao == 'ATIVO'. Confirmado por diagnostico (history/diag.json):
+    ATIVO ~4,5k (bate com o BI); INATIVO/VISITANTE/TRANCADO ficam de fora. A base
+    /clientes/simples devolve ~81k registros historicos — por isso o corte por situacao."""
+    return strip_accents(str(it.get("situacao") or "")).strip().upper() == "ATIVO"
 
 def classifica(usa_app, fim_ms):
     """1a) uso do app + contrato. dias = quanto falta para o fim do contrato."""
