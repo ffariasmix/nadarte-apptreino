@@ -43,6 +43,13 @@ def main():
             (u.get("nome") or "")[:12], sf(u.get("totalAlunos")), sf(u.get("percUtilizamApp")),
             sf(u.get("totalTreinosEmDia")), sf(u.get("totalTreinosVencidos")),
             sf(u.get("avaliacoesRealizadas")), sf(u.get("avaliacoesAtrasadas"))), file=sys.stderr)
+    alunos = data.get("alunos", [])
+    if alunos:
+        eng = sum(1 for a in alunos if a.get("faixa") == "engajado")
+        mor = sum(1 for a in alunos if a.get("faixa") == "morno")
+        ris = sum(1 for a in alunos if a.get("faixa") == "risco")
+        print("\nCRM por aluno: %d elegiveis (engajado %d · morno %d · risco %d) em %d professores"
+              % (len(alunos), eng, mor, ris, len(data.get("professores", []))), file=sys.stderr)
     if check:
         return
     tpl = open(TEMPLATE, encoding="utf-8").read()
