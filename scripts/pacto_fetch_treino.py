@@ -167,33 +167,65 @@ def classifica(usa_app, fim_ms):
     return "morno"
 
 def fetch_carteira(key, ulabel):
-    """Puxa a base ativa paginando /clientes/simples de forma adaptativa.
-    Lida com: size respeitado (paginas grandes), size ignorado (20/pag mas page ok),
-    e page ignorado (para apos detectar nao-avanco)."""
+    """Base ativa via /clientes/simples com paginacao ROBUSTA (KB 5.2 — a base historica
+    e instavel: totais oscilam e ha paginas vazias no meio). Estrategia:
+      1) tenta filtrar situacao=ATIVO no servidor (muito mais rapido); se o filtro for
+         ignorado, cai para varredura completa;
+      2) le o total, pagina direcionado pelo total (size=200), re-tenta paginas vazias
+         numa 2a passada e faz dedup por codigoCliente."""
+    SIZE = 200
+
+    def fetch_page(pg, extra, tries=3):
+        for _ in range(tries):
+            st, body = http_get(key, "/clientes/simples?" + q(page=pg, size=SIZE) + extra)
+            if st != 200:
+                time.sleep(0.5); continue
+            try:
+                j = json.loads(body)
+            except Exception:
+                time.sleep(0.5); continue
+            c = j.get("content", j)
+            if isinstance(c, dict):
+                c = c.get("lista") or c.get("content") or []
+            total = j.get("totalElements") or j.get("total") or j.get("totalRegistros")
+            return (c if isinstance(c, list) else []), (int(total) if total else None)
+        return [], None
+
+    # 1) tenta o filtro situacao=ATIVO
+    extra = "&situacao=ATIVO"
+    first, total = fetch_page(0, extra)
+    filtro_ok = bool(first) and all(strip_accents(str(x.get("situacao") or "")).upper() == "ATIVO" for x in first)
+    if not filtro_ok:
+        extra = ""                       # filtro ignorado/indisponivel -> varredura completa
+        first, total = fetch_page(0, extra)
+
     seen = {}
-    prev_first = None
-    page = 0
-    while page < 300:
-        st, body = http_get(key, "/clientes/simples?" + q(page=page, size=200))
-        try:
-            j = json.loads(body); c = j.get("content", j)
-        except Exception:
-            c = None
-        if st != 200 or not isinstance(c, list) or not c:
-            break
-        fid = c[0].get("codigoCliente") or c[0].get("matricula")
-        if fid == prev_first and page > 0:
-            break  # paginacao nao avancou (page ignorado)
-        novos = 0
-        for it in c:
+    def add(items):
+        for it in items:
             cid = it.get("codigoCliente") or it.get("matricula")
             if cid is not None and cid not in seen:
-                seen[cid] = it; novos += 1
-        if novos == 0:
+                seen[cid] = it
+    add(first)
+
+    n_pages = ((total + SIZE - 1) // SIZE + 2) if total else 450
+    vazias, consec = [], 0
+    for pg in range(1, n_pages):
+        if total and len(seen) >= total:
             break
-        prev_first = fid
-        page += 1
-    print("  [carteira] %s: %d alunos em %d pagina(s)" % (ulabel, len(seen), page), file=sys.stderr)
+        items, _ = fetch_page(pg, extra)
+        if not items:
+            vazias.append(pg); consec += 1
+            if not total and consec >= 8:   # sem total conhecido: para apos varias vazias seguidas
+                break
+            continue
+        consec = 0
+        add(items)
+    # 2) 2a passada: re-tenta SO as paginas que vieram vazias (instabilidade)
+    for pg in vazias:
+        add(fetch_page(pg, extra)[0])
+
+    print("  [carteira] %s: %d registros (filtro=%s, total=%s)" % (
+        ulabel, len(seen), "ATIVO" if extra else "todos", total if total is not None else "?"), file=sys.stderr)
     return list(seen.values())
 
 def usa_app(key, cid):
