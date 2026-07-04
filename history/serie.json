@@ -57,10 +57,21 @@
    "emDiaPct": 61.9,
    "vencidos": 931,
    "avalVencidas": 501,
-   "ativos": 1482,
-   "engajado": 279,
-   "morno": 1080,
-   "risco": 123
+   "ativos": 5021,
+   "engajado": 1113,
+   "morno": 3549,
+   "risco": 359,
+   "semdado": 0,
+   "appSim": 1216,
+   "appNao": 3805,
+   "appFalha": 0,
+   "elegiveis": 4748,
+   "publicoAlvo": {
+    "Fitness": 4748,
+    "Ambos": 0,
+    "Agua": 0,
+    "LutasEOutros": 0
+   }
   },
   "unidades": [
    {
