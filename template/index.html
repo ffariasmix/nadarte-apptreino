@@ -59,7 +59,7 @@
   td{padding:11px 10px;border-bottom:1px solid var(--line)}tr:last-child td{border:none}
   .tbl{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}.scroll{overflow-x:auto}
   .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px}
-  .c-red{background:#FBE8E8;color:#b53434}.c-amber{background:#FDF3DC;color:#a97c00}.c-green{background:#E7F4EB;color:#3f8a52}
+  .c-red{background:#FBE8E8;color:#b53434}.c-amber{background:#FDF3DC;color:#a97c00}.c-green{background:#E7F4EB;color:#3f8a52}.c-gray{background:#EEF1F6;color:#5a6b86}
   .bar{height:7px;border-radius:5px;background:#EEEAE4;overflow:hidden;min-width:70px;flex:1}.bar>i{display:block;height:100%;border-radius:5px}
   .note{background:#FFF8F1;border:1px solid #f6d3bd;border-radius:11px;padding:14px 16px;font-size:var(--fs-caption);color:#7a4a2a;margin-top:14px}
   .meth{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;box-shadow:var(--shadow);margin-bottom:16px}
@@ -235,7 +235,7 @@ window.DATA = /*__DATA__*/null;
         <div class="roadcard"><div class="t">Professores 360º</div><div class="d">Ranking de atuação por professor (carteira, fichas em dia/vencidas, % em dia, índice). Fonte: <code>bi-professores-vinculos</code>.</div><div class="badge" style="background:#E7F4EB;color:#3f8a52">✓ no ar</div></div>
         <div class="roadcard"><div class="t">Nota do treino (NPS)</div><div class="d">Avaliação que os alunos dão ao treino (1–5) e NPS. Endpoint <code>avaliacao-treino</code> retornando 500 — depende de correção na Pacto.</div><div class="badge">bloqueado (Pacto)</div></div>
         <div class="roadcard"><div class="t">Índice de engajamento</div><div class="d">Score 0–100 por aluno (uso do app, ficha em dia, avaliação, feedback) com faixas Engajado/Morno/Em risco.</div><div class="badge">depende do CRM por aluno</div></div>
-        <div class="roadcard"><div class="t">Corte Público-Alvo</div><div class="d">Separar Fitness/Ambos de Água/Lutas por aluno. O campo <code>categoria</code> vem vazio na base — depende de uma fonte de modalidade na Pacto.</div><div class="badge">bloqueado (categoria vazia)</div></div>
+        <div class="roadcard"><div class="t">Corte Público-Alvo</div><div class="d">Fitness/Ambos × Água/Lutas por aluno, a partir da <code>descricao</code> do plano (dados-pessoais), com a mesma lógica do dashboard de Frequência.</div><div class="badge" style="background:#E7F4EB;color:#3f8a52">✓ no ar (filtro no CRM 360º)</div></div>
         <div class="roadcard"><div class="t">Séries históricas</div><div class="d">Evolução mês a mês dos indicadores por unidade (acumulando as coletas diárias).</div><div class="badge">acumula com o tempo</div></div>
       </div>
       <div class="note">A versão de protótipo (com dados fictícios) mostra como essas telas ficam. Cada item acima é ligado ao vivo conforme destravamos a fonte de dados e a decisão de acesso/PII.</div>`;
@@ -327,12 +327,12 @@ window.DATA = /*__DATA__*/null;
     const start=(state.crmPage-1)*PER, rows=A.slice(start,start+PER);
     const showUnit = state.unit==='all';
     let h='<div class="tbl"><div class="scroll"><table><thead><tr><th>Aluno</th>'
-      +(showUnit?'<th>Unidade</th>':'')+'<th>Usa o app</th><th>Contrato</th><th>Faixa</th></tr></thead><tbody>';
-    if(!rows.length){ h+=`<tr><td colspan="${showUnit?5:4}"><div class="empty" style="border:none;padding:26px">Nenhum aluno nesta combinação de filtros.</div></td></tr>`; }
+      +(showUnit?'<th>Unidade</th>':'')+'<th>Público-alvo</th><th>Usa o app</th><th>Contrato</th><th>Faixa</th></tr></thead><tbody>';
+    if(!rows.length){ h+=`<tr><td colspan="${showUnit?6:5}"><div class="empty" style="border:none;padding:26px">Nenhum aluno nesta combinação de filtros.</div></td></tr>`; }
     rows.forEach(a=>{ const f=FA[a.faixa]||['—','']; h+=`<tr>
       <td><div class="aluno-cell">${avatar(a)}<div><div class="nm">${esc(a.nome)||'—'}</div><div class="ct">${esc(a.email||'')}${a.telefone?(a.email?' · ':'')+esc(a.telefone):''}</div></div></div></td>`
       +(showUnit?`<td>${esc(a.unitNome)}</td>`:'')
-      +`<td>${appPill(a.usaApp)}</td><td>${contratoPill(a.diasContrato)}</td>
+      +`<td><span class="pill c-gray">${esc(a.categoria)||'—'}</span></td><td>${appPill(a.usaApp)}</td><td>${contratoPill(a.diasContrato)}</td>
       <td><span class="pill ${f[1]}">${f[0]}</span></td></tr>`; });
     h+='</tbody></table></div>';
     h+=`<div class="pager"><span style="color:#8A8A8A;font-size:12.5px">${fmt(A.length)} aluno(s) · página ${state.crmPage} de ${pages}</span>
@@ -369,7 +369,7 @@ window.DATA = /*__DATA__*/null;
     // busca
     h+='<div class="subf"><span class="flab">Buscar</span><input class="srch" id="crmSearch" type="text" placeholder="nome do aluno…" value="'+esc(state.crmQ||'')+'"></div>';
     h+='<div id="crmResults" style="margin-top:12px"></div>';
-    h+='<div class="note"><b>Como lemos a faixa (dados reais disponíveis):</b> <b>Engajado</b> = usa o App Treino e contrato vigente; <b>Morno</b> = usa o app mas contrato a vencer, ou não usa mas contrato ok; <b>Em risco</b> = não usa o app e contrato vencendo/vencido. Base: <b>alunos ativos</b> (contrato vigente) via <code>/clientes/simples</code> + uso do app via <code>/psec/alunos/alunoApp</code>. <b>Corte por público-alvo (Fitness/Água):</b> pendente — o campo <code>categoria</code> não vem preenchido nesta base; precisa de outra fonte de modalidade na Pacto. O "treino em dia" por aluno também depende de endpoint da Pacto em erro (500).</div>';
+    h+='<div class="note"><b>Como lemos a faixa (dados reais disponíveis):</b> <b>Engajado</b> = usa o App Treino e contrato vigente; <b>Morno</b> = usa o app mas contrato a vencer, ou não usa mas contrato ok; <b>Em risco</b> = não usa o app e contrato vencendo/vencido. Base: <b>alunos ativos</b> (situação = ATIVO) via <code>/clientes/simples</code> + uso do app via <code>/psec/alunos/alunoApp</code>. <b>Público-alvo</b> (Fitness/Ambos/Água/Lutas e Outros) vem da <code>descricao</code> do plano (dados-pessoais), com a mesma lógica do dashboard de Frequência — use o filtro acima. O "treino em dia" por aluno ainda depende de endpoint da Pacto em erro (500).</div>';
     el.innerHTML=h;
     el.querySelectorAll('.chip.cf').forEach(b=>b.onclick=()=>{ state.crmFaixa=b.dataset.f; state.crmPage=1; renderCRM(); });
     el.querySelectorAll('.chip.cp').forEach(b=>b.onclick=()=>{ state.crmPub=b.dataset.p; state.crmPage=1; renderCRM(); });
