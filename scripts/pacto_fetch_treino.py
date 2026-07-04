@@ -122,6 +122,39 @@ def ativo(it):
     /clientes/simples devolve ~81k registros historicos — por isso o corte por situacao."""
     return strip_accents(str(it.get("situacao") or "")).strip().upper() == "ATIVO"
 
+# --- Categoria / publico-alvo (LOGICA UNIFICADA com o dashboard de Frequencia) ---
+# Fonte do texto: campo `descricao` do plano (em /clientes/{matricula}/dados-pessoais).
+_AGUA  = ("NATAC","NATA","HIDRO","BEBE","AQUA")
+_LUTAS = ("KARATE","MUAY","JIU","JUDO","HAPKIDO","CAPOEIRA","BOXE","TAEKWON","KUNG","LUTA")
+_FIT   = ("TRANSITO LIVRE","FITNESS","MUSCULA","DANCA","PILATES","AULA COLETIVA","FUNCIONAL",
+          "SPINNING","CROSS","ZUMBA","RITMO","GINASTICA","ALONGA","YOGA","TREINA")
+
+def _up(s):
+    return strip_accents(str(s or "")).upper().strip()
+
+def _tok_cat(tok):
+    t = _up(tok)                       # prioridade: Agua -> Fit -> Lutas (resolve ambiguidade)
+    if any(k in t for k in _AGUA):  return "agua"
+    if any(k in t for k in _FIT):   return "fit"
+    if any(k in t for k in _LUTAS): return "lutas"
+    return "outros"
+
+def classify_grupo(descricao):
+    """Devolve Fitness / Ambos / Agua / Lutas e Outros a partir do texto de modalidades."""
+    toks = [t for t in str(descricao or "").replace(";", ",").split(",") if t.strip()]
+    baldes = set(_tok_cat(t) for t in toks)
+    if not baldes:                                        # sem modalidade -> Fitness (default)
+        return "Fitness"
+    if "agua" in baldes and ("fit" in baldes or "lutas" in baldes):
+        return "Ambos"
+    if "agua" in baldes:                                  # agua (ou agua+outros)
+        return "Agua"
+    if "fit" in baldes:
+        return "Fitness"
+    return "Lutas e Outros"                               # so lutas e/ou outros
+
+ELEGIVEIS = ("Fitness", "Ambos")   # quem usa o App Treino
+
 def classifica(usa_app, fim_ms):
     """1a) uso do app + contrato. dias = quanto falta para o fim do contrato."""
     dias = (fim_ms - NOW_MS) / 86400000.0 if fim_ms else None
@@ -171,6 +204,21 @@ def usa_app(key, cid):
         j = json.loads(body); c = j.get("content", j)
         v = c.get("usaApp") if isinstance(c, dict) else None
         return bool(v)
+    except Exception:
+        return None
+
+def categoria_aluno(key, matricula):
+    """Publico-alvo do aluno: le `descricao` (modalidades) em dados-pessoais e classifica.
+    Retorna a categoria (Fitness/Ambos/Agua/Lutas e Outros) ou None se a chamada falhar."""
+    if matricula is None:
+        return None
+    st, body = http_get(key, "/clientes/%s/dados-pessoais" % matricula, tries=3, timeout=20)
+    if st != 200:
+        return None
+    try:
+        j = json.loads(body); c = j.get("content", j)
+        desc = c.get("descricao") if isinstance(c, dict) else None   # so a modalidade (ignora cpf/PII)
+        return classify_grupo(desc)
     except Exception:
         return None
 
@@ -280,33 +328,34 @@ def main():
     with ThreadPoolExecutor(max_workers=len(UNITS)) as ex:
         list(ex.map(run, UNITS))
 
-    # ---- FASE 2: uso do app numa FILA GLOBAL (concorrencia limitada -> sem rate limit) ----
-    tarefas = []  # (uk, key, cid)
+    # ---- FASE 2: uso do app + categoria numa FILA GLOBAL (concorrencia limitada) ----
+    tarefas = []  # (uk, key, cid, matricula)
     for uk in sorted(resultados):
         key = keys.get(uk)
         for it in resultados[uk].get("ativos", []):
             cid = it.get("codigoCliente") or it.get("matricula")
-            tarefas.append((uk, key, cid))
-    app_res = {}  # (uk, cid) -> True / False / None(falha)
+            tarefas.append((uk, key, cid, it.get("matricula")))
+    app_res = {}  # (uk, cid) -> (usaApp True/False/None, categoria/None)
     n_true = n_false = n_fail = 0
     if tarefas and not DIAG:
         def _one(t):
-            uk, key, cid = t
-            return (uk, cid, usa_app(key, cid))
+            uk, key, cid, mat = t
+            return (uk, cid, usa_app(key, cid), categoria_aluno(key, mat))
         with ThreadPoolExecutor(max_workers=6) as ex:   # <= gentil com a API
-            for uk, cid, v in ex.map(_one, tarefas):
-                app_res[(uk, cid)] = v
-        # 2a tentativa (sequencial e leve) so para os que falharam
-        faltas = [(uk, key, cid) for (uk, key, cid) in tarefas if app_res.get((uk, cid)) is None]
+            for uk, cid, ua, cat in ex.map(_one, tarefas):
+                app_res[(uk, cid)] = (ua, cat)
+        # 2a tentativa (sequencial e leve) so para os que falharam no uso do app
+        faltas = [(uk, key, cid, mat) for (uk, key, cid, mat) in tarefas if app_res.get((uk, cid), (None, None))[0] is None]
         if faltas:
             print("  [app] re-tentando %d chamadas que falharam..." % len(faltas), file=sys.stderr)
-            for uk, key, cid in faltas:
+            for uk, key, cid, mat in faltas:
                 time.sleep(0.12)
-                app_res[(uk, cid)] = usa_app(key, cid)
-        for v in app_res.values():
-            n_true  += 1 if v is True else 0
-            n_false += 1 if v is False else 0
-            n_fail  += 1 if v is None else 0
+                prev = app_res.get((uk, cid), (None, None))
+                app_res[(uk, cid)] = (usa_app(key, cid), prev[1] if prev[1] is not None else categoria_aluno(key, mat))
+        for ua, _cat in app_res.values():
+            n_true  += 1 if ua is True else 0
+            n_false += 1 if ua is False else 0
+            n_fail  += 1 if ua is None else 0
         print("[app] usaApp -> sim %d | nao %d | falha %d (de %d ativos)"
               % (n_true, n_false, n_fail, len(tarefas)), file=sys.stderr)
 
@@ -317,12 +366,13 @@ def main():
         for it in r.get("ativos", []):
             cid = it.get("codigoCliente") or it.get("matricula")
             fim_ms = parse_date_ms(it.get("fimContrato"))
-            ua = app_res.get((uk, cid))          # True / False / None
+            ua, cat = app_res.get((uk, cid), (None, None))   # usaApp, categoria(publico-alvo)
             faixa = classifica(bool(ua), fim_ms) if ua is not None else "semdado"
             u_alunos.append({
                 "unit": uk, "unitNome": r["ulabel"],
                 "nome": it.get("nome"), "matricula": it.get("matricula"),
-                "foto": it.get("urlFoto"), "categoria": it.get("categoria"),
+                "foto": it.get("urlFoto"),
+                "categoria": cat, "elegivel": (cat in ELEGIVEIS) if cat else None,
                 "situacao": it.get("situacao"), "situacaoContrato": it.get("situacaoContrato"),
                 "inicioContrato": parse_date_ms(it.get("inicioContrato")), "fimContrato": fim_ms,
                 "diasContrato": round((fim_ms - NOW_MS) / 86400000.0) if fim_ms else None,
@@ -339,6 +389,7 @@ def main():
             "morno": sum(1 for a in u_alunos if a["faixa"] == "morno"),
             "risco": sum(1 for a in u_alunos if a["faixa"] == "risco"),
             "semdado": sum(1 for a in u_alunos if a["faixa"] == "semdado"),
+            "elegiveis": sum(1 for a in u_alunos if a["elegivel"] is True),
         }
 
     os.makedirs("data", exist_ok=True)
@@ -372,6 +423,9 @@ def main():
             "usoApp": {"sim": n_true, "nao": n_false, "falha": n_fail},
             "faixas": {f: sum(1 for a in alunos if a["faixa"] == f)
                        for f in ("engajado", "morno", "risco", "semdado")},
+            "publicoAlvo": {c: sum(1 for a in alunos if a.get("categoria") == c)
+                            for c in ("Fitness", "Ambos", "Agua", "Lutas e Outros")},
+            "elegiveis": sum(1 for a in alunos if a.get("elegivel") is True),
             "biTotalPorUnidade": {r_["unit"]["nome"]: r_["unit"].get("totalAlunos")
                                   for r_ in resultados.values()},
             "situacao": dict(sorted(sit_total.items(), key=lambda x: -x[1])),
