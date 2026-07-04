@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""probe v13 — caçar 3 alvos travados, usando IDs reais:
-  (A) Professor -> LISTA de alunos da carteira (o vinculo existe: quem prescreve o treino)
-  (B) Nota / NPS do treino (irmaos do avaliacao-treino)
-  (C) Ficha/avaliacao POR ALUNO (indicadores -> lista, e ficha por codigoPessoa)
-PII-safe: imprime SO status, nomes de campo e a mensagem de ERRO (sem valores)."""
-import os, sys, json, urllib.request, urllib.error, urllib.parse
+"""probe v14 — achar ONDE a MODALIDADE do aluno vive na API (o `descricao` de
+dados-pessoais veio vazio -> publico-alvo saiu 100% Fitness). Testa candidatos e
+mostra as CHAVES + o valor de campos com cara de modalidade/plano.
+PII-safe: imprime chaves e valores SO de campos de modalidade/plano (nunca nome/cpf)."""
+import os, sys, json, unicodedata, urllib.request, urllib.error, urllib.parse
 BASE = "https://apigw.pactosolucoes.com.br"
 KEYS = ["PACTO_KEY_716NORTE","PACTO_KEY_905SUL","PACTO_KEY_604NORTE","PACTO_KEY_LAGONORTE","PACTO_KEY_LAGOSUL","PACTO_KEY_NATAL"]
+
+def up(s): return "".join(c for c in unicodedata.normalize("NFD", str(s or "")) if unicodedata.category(c)!="Mn").lower()
 
 def get(key, path, timeout=30):
     h={"Authorization":"Bearer "+key,"Accept":"application/json","empresaId":"1"}
@@ -17,32 +18,35 @@ def get(key, path, timeout=30):
     except urllib.error.HTTPError as e: return e.code,(e.read().decode("utf-8","replace") if e.fp else "")
     except Exception as ex: return -1,str(ex)[:100]
 
-def shape(body):
-    try: j=json.loads(body)
-    except Exception: return "(nao-JSON len=%d)"%len(body)
-    def d(x,dep=0):
-        if isinstance(x,dict):
-            inner=" ->"+d(x.get("content"),dep+1) if ("content" in x and dep==0) else ""
-            return "obj{%s}%s"%(", ".join(list(x.keys())[:30]),inner)
-        if isinstance(x,list): return "lista[%d]%s"%(len(x),(" item0="+d(x[0],dep+1) if x else ""))
-        return type(x).__name__
-    return d(j)
-
-def err(body):
-    try:
-        j=json.loads(body); m=j.get("meta",j) if isinstance(j,dict) else j
-        for k in ("mensagem","message","erro","error","detalhe","detail"):
-            if isinstance(m,dict) and m.get(k): return "%s=%s"%(k,str(m[k])[:160])
-        return json.dumps(m,ensure_ascii=False)[:180]
-    except Exception: return body[:120].replace("\n"," ")
-
-def rep(nome, st, body):
-    if st==200: print("  200  %-40s  %s"%(nome, shape(body)[:340]), file=sys.stderr)
-    else:       print("%5s  %-40s  ERRO: %s"%(st, nome, err(body)), file=sys.stderr)
-
 def content(body):
     try: j=json.loads(body); return j.get("content", j)
     except Exception: return None
+
+# campos que interessam (modalidade/plano) — so estes tem valor impresso; PII (nome/cpf) NUNCA
+CAND = ("descric","plano","planos","modalidad","categoria","produto","servic","contrato","turma","atividade")
+PII  = ("cpf","nome","email","telefone","rg","nasc","endereco","senha")
+
+def dump(nome, st, body):
+    if st != 200:
+        print("%5s  %-38s  (sem 200)"%(st, nome), file=sys.stderr); return
+    c = content(body)
+    if isinstance(c, list): c0 = c[0] if c else {}
+    else: c0 = c
+    if not isinstance(c0, dict):
+        print("  200  %-38s  tipo=%s"%(nome, type(c0).__name__), file=sys.stderr); return
+    chaves = [k for k in c0.keys()]
+    vals = []
+    for k, v in c0.items():
+        kl = up(k)
+        if any(p in kl for p in PII):  # nunca imprime PII
+            continue
+        if any(t in kl for t in CAND) and isinstance(v, (str, int, float)) and str(v).strip():
+            vals.append("%s=%s" % (k, str(v)[:70]))
+    print("  200  %-38s  CHAVES: %s"%(nome, ", ".join(str(k) for k in chaves)[:220]), file=sys.stderr)
+    if vals:
+        print("            >> modalidade/plano: %s"%(" | ".join(vals)[:280]), file=sys.stderr)
+    else:
+        print("            >> nenhum campo de modalidade com valor aqui", file=sys.stderr)
 
 def main():
     key=None
@@ -50,59 +54,34 @@ def main():
         if os.environ.get(k): key=os.environ[k]; break
     if not key: print("sem chave",file=sys.stderr); sys.exit(1)
 
-    # ---- IDs reais ----
-    PID=None
-    st,b=get(key,"/psec/colaboradores/bi-professores-vinculos")
-    c=content(b)
-    if isinstance(c,list) and c:
-        print("== [0] bi-professores-vinculos: chaves de UM professor (procurar lista de alunos) ==",file=sys.stderr)
-        print("   item0=",shape(json.dumps(c[0]))[:400],file=sys.stderr)
-        PID=(c[0].get("professor") or {}).get("id")
-    CID=MAT=CP=None
-    st,b=get(key,"/clientes/simples?page=0&size=5")
-    c=content(b)
-    if isinstance(c,list) and c:
-        CID=c[0].get("codigoCliente"); MAT=c[0].get("matricula")
-    if MAT is not None:
-        st,b=get(key,"/clientes/%s/dados-pessoais"%MAT)
-        cc=content(b)
-        if isinstance(cc,dict): CP=cc.get("codigoPessoa")
-    print("   IDs -> professor=%s cliente=%s matricula=%s codigoPessoa=%s"%(PID,CID,MAT,CP),file=sys.stderr)
-    P=str(PID); C=str(CP); CL=str(CID)
+    # pega 1 aluno ATIVO real (matricula + codigoCliente)
+    st,b=get(key,"/clientes/simples?"+urllib.parse.urlencode({"situacao":"ATIVO","page":0,"size":5}))
+    c=content(b);
+    if not (isinstance(c,list) and c):
+        st,b=get(key,"/clientes/simples?page=0&size=5"); c=content(b)
+    it = next((x for x in c if up(x.get("situacao"))=="ativo"), c[0]) if isinstance(c,list) and c else {}
+    MAT=it.get("matricula"); CID=it.get("codigoCliente")
+    print("== ids: matricula=%s codigoCliente=%s | chaves de clientes/simples: %s"%(
+        MAT, CID, ", ".join(it.keys())), file=sys.stderr)
 
-    print("== (A) PROFESSOR -> LISTA DE ALUNOS ==",file=sys.stderr)
-    for nome,path in [
-        ("professores/{id}/alunos", "/psec/professores/%s/alunos"%P),
-        ("colaboradores/{id}/alunos","/psec/colaboradores/%s/alunos"%P),
-        ("treino-bi/alunos?idProfessor","/psec/treino-bi/alunos?idProfessor=%s"%P),
-        ("treino/alunos?idProfessor","/psec/treino/alunos?idProfessor=%s"%P),
-        ("treino-bi/carteira?idProfessor","/psec/treino-bi/carteira?idProfessor=%s"%P),
-        ("professores/{id}/carteira","/psec/professores/%s/carteira"%P),
-        ("colaboradores/{id}/carteira","/psec/colaboradores/%s/carteira"%P),
-    ]:
-        s2,b2=get(key,path); rep(nome,s2,b2)
+    print("== (A) dados-pessoais (esperavamos 'descricao' com a modalidade) ==", file=sys.stderr)
+    dump("clientes/%s/dados-pessoais"%MAT, *get(key,"/clientes/%s/dados-pessoais"%MAT))
 
-    print("== (B) NOTA / NPS DO TREINO ==",file=sys.stderr)
-    for nome,path in [
-        ("avaliacao-treino/0","/psec/treino-bi/avaliacao-treino/0"),
-        ("avaliacao-treino/0/{cp}","/psec/treino-bi/avaliacao-treino/0/%s"%C),
-        ("treino-bi/nps","/psec/treino-bi/nps"),
-        ("treino-bi/satisfacao","/psec/treino-bi/satisfacao"),
-        ("treino-bi/avaliacoes","/psec/treino-bi/avaliacoes"),
-        ("treino-bi/feedback","/psec/treino-bi/feedback"),
-    ]:
-        s2,b2=get(key,path); rep(nome,s2,b2)
+    print("== (B) detalhe do cliente (/v1/cliente/{codigoCliente}) ==", file=sys.stderr)
+    dump("v1/cliente/%s"%CID, *get(key,"/v1/cliente/%s"%CID))
 
-    print("== (C) FICHA / INDICADOR POR ALUNO ==",file=sys.stderr)
+    print("== (C) contratos em bulk (/v1/contrato) — ideal p/ juntar por cliente ==", file=sys.stderr)
+    dump("v1/contrato?size=3", *get(key,"/v1/contrato?page=0&size=3"))
+
+    print("== (D) outros caminhos de plano/modalidade por aluno ==", file=sys.stderr)
     for nome,path in [
-        ("indicadores-atividade (lista)","/psec/professores/indicadores-atividade"),
-        ("indicadores (lista alt)","/psec/professores/indicadores"),
-        ("treino/ficha/{cp}","/psec/treino/ficha/%s"%C),
-        ("treino-bi/ficha/{cp}","/psec/treino-bi/ficha/%s"%C),
-        ("alunos/{cp}/treino","/psec/alunos/%s/treino"%C),
-        ("treino-bi/aluno/{cp}","/psec/treino-bi/aluno/%s"%C),
-        ("treino/aluno/{cliente}","/psec/treino/aluno/%s"%CL),
+        ("clientes/{mat}/contratos", "/clientes/%s/contratos"%MAT),
+        ("clientes/{mat}/plano",     "/clientes/%s/plano"%MAT),
+        ("clientes/{mat}/modalidades","/clientes/%s/modalidades"%MAT),
+        ("clientes/{mat}/contrato",  "/clientes/%s/contrato"%MAT),
+        ("v1/contrato/cliente/{cid}","/v1/contrato/cliente/%s"%CID),
+        ("clientes/{cid}/detalhe",   "/clientes/%s/detalhe"%CID),
     ]:
-        s2,b2=get(key,path); rep(nome,s2,b2)
+        dump(nome, *get(key,path))
 
 if __name__=="__main__": main()
