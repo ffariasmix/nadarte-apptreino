@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""probe v15 — abrir /v1/cliente/{codigoCliente} e achar a MODALIDADE dentro de
-`vinculos` (dados-pessoais nao tem `descricao`; a modalidade parece estar aqui).
-PII-safe: imprime a estrutura de vinculos/clienteSintetico com valores, mas
-REDIGE qualquer campo com cara de dado pessoal (nome/cpf/telefone/email/nascimento)."""
+"""probe v16 — confirmar o JOIN aluno->professor de treino.
+Compara os CODIGOS de colaborador em /v1/cliente/{id}.vinculos com os IDs dos
+professores de treino (bi-professores-vinculos). Se houver overlap, o modelo
+'faz treino = vinculado a professor de treino' funciona.
+PII-safe: imprime SO codigos e contagens (nunca nomes)."""
 import os, sys, json, unicodedata, urllib.request, urllib.error, urllib.parse
 BASE = "https://apigw.pactosolucoes.com.br"
 KEYS = ["PACTO_KEY_716NORTE","PACTO_KEY_905SUL","PACTO_KEY_604NORTE","PACTO_KEY_LAGONORTE","PACTO_KEY_LAGOSUL","PACTO_KEY_NATAL"]
-PII = ("cpf","nome","email","telefone","fone","rg","nasc","endereco","logradouro","senha","foto","genero","sexo","idade")
 
 def up(s): return "".join(c for c in unicodedata.normalize("NFD", str(s or "")) if unicodedata.category(c)!="Mn").lower()
 
@@ -23,46 +23,53 @@ def content(body):
     try: j=json.loads(body); return j.get("content", j)
     except Exception: return None
 
-def red(obj, depth=0):
-    """Copia a estrutura redigindo PII (chaves com nome/cpf/etc viram ***)."""
-    if depth > 5: return "..."
-    if isinstance(obj, dict):
-        out = {}
-        for k, v in obj.items():
-            out[k] = "***" if any(p in up(k) for p in PII) else red(v, depth+1)
-        return out
-    if isinstance(obj, list):
-        return [red(x, depth+1) for x in obj[:3]]   # so 3 itens de amostra
-    if isinstance(obj, str) and len(obj) > 80:
-        return obj[:80] + "…"
-    return obj
-
 def main():
     key=None
     for k in KEYS:
         if os.environ.get(k): key=os.environ[k]; break
     if not key: print("sem chave",file=sys.stderr); sys.exit(1)
 
-    st,b=get(key,"/clientes/simples?"+urllib.parse.urlencode({"situacao":"ATIVO","page":0,"size":8}))
+    # 1) professores de treino (id) desta unidade
+    profs = content(get(key,"/psec/colaboradores/bi-professores-vinculos")[1])
+    prof_ids = set()
+    if isinstance(profs, list):
+        for p in profs:
+            pid = (p.get("professor") or {}).get("id")
+            if pid is not None: prof_ids.add(str(pid))
+    print("== professores de treino: %d | ids(amostra): %s" % (
+        len(prof_ids), sorted(prof_ids)[:15]), file=sys.stderr)
+
+    # 2) amostra de 12 alunos ATIVO -> codigos de colaborador no vinculos + tipos
+    st,b=get(key,"/clientes/simples?"+urllib.parse.urlencode({"situacao":"ATIVO","page":0,"size":12}))
     c=content(b)
     if not (isinstance(c,list) and c):
-        st,b=get(key,"/clientes/simples?page=0&size=8"); c=content(b)
-    # tenta ate 3 alunos ATIVO (pra ver variedade de modalidade)
-    alvos=[x for x in c if up(x.get("situacao"))=="ativo"][:3] if isinstance(c,list) else []
-    if not alvos and isinstance(c,list): alvos=c[:3]
-    print("== vou inspecionar %d aluno(s) ATIVO em /v1/cliente/{codigoCliente} ==" % len(alvos), file=sys.stderr)
+        st,b=get(key,"/clientes/simples?page=0&size=12"); c=content(b)
+    alvos=[x for x in c if up(x.get("situacao"))=="ativo"][:12] if isinstance(c,list) else []
 
+    tipos = {}
+    com_prof_treino = 0
+    codes_vistos = set()
     for it in alvos:
         cid=it.get("codigoCliente")
-        st,b=get(key,"/v1/cliente/%s"%cid)
-        cli=content(b)
-        if not isinstance(cli, dict):
-            print("  cliente %s -> status %s (sem objeto)"%(cid, st), file=sys.stderr); continue
-        print("\n---- codigoCliente=%s ----"%cid, file=sys.stderr)
-        for campo in ("vinculos","clienteSintetico"):
-            if campo in cli:
-                print("  [%s] = %s" % (campo, json.dumps(red(cli[campo]), ensure_ascii=False)[:900]), file=sys.stderr)
-            else:
-                print("  [%s] ausente" % campo, file=sys.stderr)
+        cli=content(get(key,"/v1/cliente/%s"%cid)[1])
+        vinc = cli.get("vinculos") if isinstance(cli,dict) else None
+        cods, tps = [], []
+        if isinstance(vinc, list):
+            for v in vinc:
+                cod = str((v.get("colaborador") or {}).get("codigo"))
+                tp  = v.get("tipoVinculo")
+                cods.append(cod); tps.append(tp)
+                codes_vistos.add(cod)
+                tipos[tp] = tipos.get(tp, 0) + 1
+        bate = [x for x in cods if x in prof_ids]
+        if bate: com_prof_treino += 1
+        print("  cliente=%s vinculos=%s tipos=%s -> bate treino? %s" % (
+            cid, cods, tps, bool(bate)), file=sys.stderr)
+
+    print("== RESUMO ==", file=sys.stderr)
+    print("  tipos de vinculo vistos:", tipos, file=sys.stderr)
+    print("  alunos (de %d) com vinculo a professor de treino: %d" % (len(alvos), com_prof_treino), file=sys.stderr)
+    print("  overlap de codigos (colaborador ∩ professores treino): %d" % len(codes_vistos & prof_ids), file=sys.stderr)
+    print("  >> se overlap>0 e 'bate treino' aparece True, o JOIN funciona.", file=sys.stderr)
 
 if __name__=="__main__": main()
