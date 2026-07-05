@@ -39,12 +39,17 @@ def main():
     print("== professores de treino: %d | ids(amostra): %s" % (
         len(prof_ids), sorted(prof_ids)[:15]), file=sys.stderr)
 
-    # 2) amostra de 12 alunos ATIVO -> codigos de colaborador no vinculos + tipos
-    st,b=get(key,"/clientes/simples?"+urllib.parse.urlencode({"situacao":"ATIVO","page":0,"size":12}))
-    c=content(b)
-    if not (isinstance(c,list) and c):
-        st,b=get(key,"/clientes/simples?page=0&size=12"); c=content(b)
-    alvos=[x for x in c if up(x.get("situacao"))=="ativo"][:12] if isinstance(c,list) else []
+    # 2) amostra ROBUSTA de 12 alunos ATIVO (varre paginas; pagina 0 pode vir vazia)
+    alvos=[]
+    for pg in range(0, 30):
+        if len(alvos) >= 12: break
+        c=content(get(key,"/clientes/simples?"+urllib.parse.urlencode({"page":pg,"size":50}))[1])
+        if not isinstance(c, list): continue
+        for x in c:
+            if up(x.get("situacao"))=="ativo":
+                alvos.append(x)
+                if len(alvos) >= 12: break
+    print("== amostra coletada: %d alunos ATIVO" % len(alvos), file=sys.stderr)
 
     tipos = {}
     com_prof_treino = 0
