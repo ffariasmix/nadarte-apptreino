@@ -111,5 +111,67 @@
     "emDiaPct": 50.0
    }
   ]
+ },
+ {
+  "data": "2026-07-05",
+  "rede": {
+   "usoApp": 40.7,
+   "emDiaPct": 61.0,
+   "vencidos": 931,
+   "avalVencidas": 500,
+   "ativos": 5004,
+   "engajado": 1112,
+   "morno": 3532,
+   "risco": 360,
+   "semdado": 0,
+   "appSim": 1213,
+   "appNao": 3791,
+   "appFalha": 0,
+   "elegiveis": 4744,
+   "publicoAlvo": {
+    "Fitness": 4744,
+    "Ambos": 0,
+    "Agua": 0,
+    "LutasEOutros": 0
+   }
+  },
+  "unidades": [
+   {
+    "id": "604Norte",
+    "nome": "604 Norte",
+    "usoApp": 42.5,
+    "emDiaPct": 58.0
+   },
+   {
+    "id": "716Norte",
+    "nome": "716 Norte",
+    "usoApp": 66.8,
+    "emDiaPct": 47.0
+   },
+   {
+    "id": "905Sul",
+    "nome": "905 Sul",
+    "usoApp": 35.6,
+    "emDiaPct": 71.0
+   },
+   {
+    "id": "LagoNorte",
+    "nome": "Lago Norte",
+    "usoApp": 34.4,
+    "emDiaPct": 47.0
+   },
+   {
+    "id": "LagoSul",
+    "nome": "Lago Sul",
+    "usoApp": 15.0,
+    "emDiaPct": 80.0
+   },
+   {
+    "id": "Natal",
+    "nome": "Natal/RN",
+    "usoApp": 57.4,
+    "emDiaPct": 49.0
+   }
+  ]
  }
 ]
