@@ -372,8 +372,10 @@ def main():
     if tarefas and not DIAG:
         def _one(t):
             uk, key, cid, mat = t
-            return (uk, cid, usa_app(key, cid), categoria_aluno(key, mat))
-        with ThreadPoolExecutor(max_workers=6) as ex:   # <= gentil com a API
+            # categoria/publico-alvo NAO vem da API (categoria vazio, descricao ausente,
+            # /v1/cliente sem plano, /v1/contrato 500) -> modalidade so na planilha.
+            return (uk, cid, usa_app(key, cid), None)
+        with ThreadPoolExecutor(max_workers=6) as ex:   # <= gentil com a API (1 chamada/aluno)
             for uk, cid, ua, cat in ex.map(_one, tarefas):
                 app_res[(uk, cid)] = (ua, cat)
         # 2a tentativa (sequencial e leve) so para os que falharam no uso do app
@@ -382,8 +384,7 @@ def main():
             print("  [app] re-tentando %d chamadas que falharam..." % len(faltas), file=sys.stderr)
             for uk, key, cid, mat in faltas:
                 time.sleep(0.12)
-                prev = app_res.get((uk, cid), (None, None))
-                app_res[(uk, cid)] = (usa_app(key, cid), prev[1] if prev[1] is not None else categoria_aluno(key, mat))
+                app_res[(uk, cid)] = (usa_app(key, cid), None)
         for ua, _cat in app_res.values():
             n_true  += 1 if ua is True else 0
             n_false += 1 if ua is False else 0
