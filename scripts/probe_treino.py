@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""probe v18 — CATALOGO de modalidades/planos/categorias.
-Em vez de olhar aluno a aluno, varre endpoints candidatos de catalogo e lista os
-NOMES de modalidades/planos disponiveis no sistema (com a categoria Fitness/Agua/
-Ambos/Lutas que o classify_grupo atribuiria a cada nome).
-PII-safe: catalogo (nomes de plano/modalidade) nao e dado pessoal."""
-import os, sys, json, unicodedata, urllib.request, urllib.error, urllib.parse
+"""probe v19 — LIGAR aluno -> plano/modalidade.
+Ja sabemos: catalogo em GET /modalidade e GET /planos; o NOME do plano carrega a
+modalidade. Falta achar de qual campo sai o plano/modalidade DE CADA ALUNO.
+Estrategia: para uma amostra de ATIVOS, busca /v1/cliente/{cid} e VARRE recursivamente
+por campos cujo nome bate plano|modalidad|contrato|produto|servico, imprimindo
+caminho->valor (texto de plano, nao PII) e a categoria de 6 baldes.
+PII-safe: so imprime campos de plano/modalidade (nunca nome/cpf/nascimento)."""
+import os, sys, json, re, unicodedata, urllib.request, urllib.error, urllib.parse
 BASE = "https://apigw.pactosolucoes.com.br"
 KEYS = [("716NORTE","PACTO_KEY_716NORTE"),("905SUL","PACTO_KEY_905SUL"),
         ("604NORTE","PACTO_KEY_604NORTE"),("LAGONORTE","PACTO_KEY_LAGONORTE"),
@@ -15,22 +17,29 @@ def _sa(s): return "".join(c for c in unicodedata.normalize("NFD", str(s or ""))
 def _up(s): return _sa(s).upper().strip()
 _AGUA=("NATAC","NATA","HIDRO","BEBE","AQUA")
 _LUTAS=("KARATE","MUAY","JIU","JUDO","HAPKIDO","CAPOEIRA","BOXE","TAEKWON","KUNG","LUTA")
-_FIT=("TRANSITO LIVRE","FITNESS","MUSCULA","DANCA","PILATES","AULA COLETIVA","FUNCIONAL",
+_FIT=("TRANSITO LIVRE"," TL ","FITNESS","MUSCULA","DANCA","PILATES","AULA COLETIVA","FUNCIONAL",
       "SPINNING","CROSS","ZUMBA","RITMO","GINASTICA","ALONGA","YOGA","TREINA")
 def _tok(t):
-    t=_up(t)
+    t=" "+_up(t)+" "
     if any(k in t for k in _AGUA): return "agua"
     if any(k in t for k in _FIT): return "fit"
     if any(k in t for k in _LUTAS): return "lutas"
     return "outros"
-def classify_grupo(desc):
-    toks=[t for t in str(desc or "").replace(";",",").split(",") if t.strip()]
+
+def categoria6(desc):
+    """6 baldes pedidos + 'Luta' (so luta) + 'Outros' (nao mapeado)."""
+    toks=[t for t in re.split(r"[;,+/]", str(desc or "")) if t.strip()]
     b=set(_tok(t) for t in toks)
-    if not b: return "Fitness"
-    if "agua" in b and ("fit" in b or "lutas" in b): return "Ambos"
-    if "agua" in b: return "Agua"
-    if "fit" in b: return "Fitness"
-    return "Lutas e Outros"
+    b.discard("outros")
+    A,F,L = "agua" in b, "fit" in b, "lutas" in b
+    if A and F and L: return "Ambos (Agua+Fitness+Luta)"
+    if A and F:       return "Ambos (Agua+Fitness)"
+    if A and L:       return "Ambos (Agua+Luta)"
+    if F and L:       return "Ambos (Fitness+Luta)"
+    if A:             return "Agua"
+    if F:             return "Fitness"
+    if L:             return "Luta"
+    return "Outros"
 
 def get(key, path, timeout=30):
     h={"Authorization":"Bearer "+key,"Accept":"application/json","empresaId":"1"}
@@ -40,71 +49,65 @@ def get(key, path, timeout=30):
     except urllib.error.HTTPError as e: return e.code,(e.read().decode("utf-8","replace") if e.fp else "")
     except Exception as ex: return -1,str(ex)[:120]
 
-def as_json(body):
-    try: return json.loads(body)
+def content(body):
+    try: j=json.loads(body); return j.get("content", j)
     except Exception: return None
 
-def listify(j):
-    """Extrai a lista de itens de varias formas de resposta {content:[...]}, [...], {content:{content:[...]}}"""
-    if isinstance(j, list): return j
-    if isinstance(j, dict):
-        c=j.get("content", j)
-        if isinstance(c, list): return c
-        if isinstance(c, dict) and isinstance(c.get("content"), list): return c["content"]
-    return None
+RX = re.compile(r"plano|modalidad|contrato|produto|servico", re.I)
+BLOCK = re.compile(r"cpf|nome|nasc|email|telefone|endereco|rg|pessoa", re.I)  # nunca imprimir
 
-NAME_FIELDS=("nome","descricao","modalidade","titulo","descricaoModalidade","nomeModalidade",
-             "nomePlano","descricaoPlano","name","label")
+def find_fields(obj, path="", out=None, depth=0):
+    if out is None: out=[]
+    if depth>7: return out
+    if isinstance(obj, dict):
+        for k,v in obj.items():
+            p=(path+"."+k) if path else k
+            if isinstance(v,(str,int,float)) and RX.search(k) and not BLOCK.search(k) and str(v).strip():
+                out.append((p, str(v)[:60]))
+            find_fields(v, p, out, depth+1)
+    elif isinstance(obj, list):
+        for v in obj[:6]:
+            find_fields(v, path+"[]", out, depth+1)
+    return out
 
-def name_of(it):
-    if not isinstance(it, dict): return str(it)[:50]
-    for f in NAME_FIELDS:
-        v=it.get(f)
-        if str(v or "").strip(): return str(v).strip()
-    # senao, mostra as chaves pra debug
-    return "{keys:"+",".join(list(it.keys())[:6])+"}"
-
-CANDIDATOS=[
-    "/modalidades","/modalidade","/v1/modalidade","/v1/modalidades","/psec/modalidades",
-    "/psec/modalidade","/planos","/plano","/v1/plano","/v1/planos","/psec/planos",
-    "/categorias","/categoria","/v1/categoria","/psec/categorias",
-    "/v1/modalidade/listar","/modalidades/listar",
-    "/produtos","/produto","/v1/produto","/servicos","/v1/servico",
-    "/plano/listar","/v1/plano/listar",
-    "/v1/contrato?page=0&size=30",
-]
-
-def probe_catalogo(label, key):
-    print("\n================ UNIDADE %s ================" % label, file=sys.stderr)
-    achou=False
-    for ep in CANDIDATOS:
-        st,body=get(key,ep)
-        j=as_json(body) if (isinstance(st,int) and 200<=st<300) else None
-        itens=listify(j) if j is not None else None
-        if itens is None:
-            print("  [%s] %s -> (sem lista)" % (str(st).rjust(3), ep), file=sys.stderr)
-            continue
-        achou=True
-        nomes=[]
-        for it in itens:
-            n=name_of(it)
-            if n and n not in nomes: nomes.append(n)
-        print("  [%s] %s -> %d item(ns)" % (str(st).rjust(3), ep, len(itens)), file=sys.stderr)
-        for n in nomes[:40]:
-            print("        - %-42s | %s" % (n[:42], classify_grupo(n)), file=sys.stderr)
-        if len(nomes)>40:
-            print("        ... (+%d)" % (len(nomes)-40), file=sys.stderr)
-    if not achou:
-        print("  (nenhum endpoint de catalogo respondeu com lista)", file=sys.stderr)
+def sample_ativos(key, alvo=8):
+    out=[]
+    for pg in range(0,40):
+        if len(out)>=alvo: break
+        c=content(get(key,"/clientes/simples?"+urllib.parse.urlencode({"page":pg,"size":50}))[1])
+        if not isinstance(c,list): continue
+        for x in c:
+            if _up(x.get("situacao"))=="ATIVO":
+                out.append(x);
+                if len(out)>=alvo: break
+    return out
 
 def main():
-    for label,env in KEYS:      # 1 unidade basta pro catalogo
-        k=os.environ.get(env)
-        if not k: continue
-        probe_catalogo(label,k)
-        break
-    else:
-        print("sem chave", file=sys.stderr); sys.exit(1)
-    print("\n>> Se algum endpoint listou modalidades/planos, temos o CATALOGO disponivel.", file=sys.stderr)
+    label=key=None
+    for lb,env in KEYS:
+        if os.environ.get(env): label,key=lb,os.environ[env]; break
+    if not key: print("sem chave",file=sys.stderr); sys.exit(1)
+    print("== UNIDADE %s ==" % label, file=sys.stderr)
+    alvos=sample_ativos(key,8)
+    print("amostra ATIVO: %d" % len(alvos), file=sys.stderr)
+    campos_freq={}   # quais paths carregam texto de plano
+    for it in alvos:
+        cid=it.get("codigoCliente") or it.get("matricula")
+        cli=content(get(key,"/v1/cliente/%s"%urllib.parse.quote(str(cid)))[1])
+        achados=find_fields(cli)
+        # mostra so paths com valor "texto de plano" (>3 chars, tem letra)
+        vistos=[(p,v) for p,v in achados if isinstance(v,str) and len(v.strip())>3 and re.search(r"[A-Za-z]",v)]
+        for p,v in vistos:
+            campos_freq[p]=campos_freq.get(p,0)+1
+        if vistos:
+            print("  cliente %s:" % cid, file=sys.stderr)
+            for p,v in vistos[:8]:
+                print("     %-38s = '%s'  -> %s" % (p[:38], v, categoria6(v)), file=sys.stderr)
+        else:
+            print("  cliente %s: (nenhum campo plano/modalidade com texto)" % cid, file=sys.stderr)
+    print("\n== PATHS que carregaram texto de plano (freq na amostra) ==", file=sys.stderr)
+    for p,n in sorted(campos_freq.items(), key=lambda x:-x[1]):
+        print("   %-40s %d/%d" % (p, n, len(alvos)), file=sys.stderr)
+    print("\n>> Se algum path aparece consistente, e a fonte da modalidade por aluno.", file=sys.stderr)
 
 if __name__=="__main__": main()
