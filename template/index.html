@@ -4,10 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nad'Arte · App Treino (Acompanhamento) — ao vivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-  :root{--bg:#F5F4F1;--card:#fff;--ink:#2D2D2D;--orange:#E8521A;--green:#5BAD6F;--amber:#F0A500;
-    --red:#D64545;--blue:#3E7CB1;--muted:#8A8A8A;--line:#EAE7E2;--soft:#FAF8F5;
-    --shadow:0 1px 3px rgba(0,0,0,.06),0 6px 18px rgba(0,0,0,.05);
+  :root{
+    /* Brand Book Digital Nad'Arte v1.0 — tokens */
+    --bg:#F5F4F1;--card:#fff;--surface:#fff;--black:#1A1A1A;--ink:#2D2D2D;
+    --orange:#E8521A;--color-primary:#E8521A;--color-primary-soft:#FBE2D7;--color-primary-dark:#A33A10;
+    --green:#5BAD6F;--green-soft:#E2F1E7;--amber:#F2C94C;--amber-soft:#FCF1CF;
+    --red:#D64545;--red-soft:#F8DEDE;--blue:#3E6DAA;--blue-soft:#E1EAF5;
+    --purple:#7A5AA8;--purple-soft:#F0EAFA;
+    --muted:#6B7280;--line:#E7E3DD;--soft:#FAF8F5;
+    --font-primary:'Inter',system-ui,-apple-system,sans-serif;--font-mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+    --chart-1:#E8521A;--chart-2:#3E6DAA;--chart-3:#5BAD6F;--chart-4:#F2C94C;--chart-5:#7A5AA8;--chart-6:#D64545;
+    --shadow:0 1px 4px rgba(45,45,45,.06),0 6px 20px rgba(45,45,45,.06);
     /* escala tipografica (padrao unico do front) */
     --fs-metric:28px;  /* numero grande (KPI) */
     --fs-title:19px;   /* titulo de pagina */
@@ -17,7 +28,7 @@
     --fs-caption:12px; /* legenda / subtexto */
     --fs-label:11px;   /* micro-rotulo (KPI, thead) */}
   *{box-sizing:border-box}html,body{margin:0}body{background:var(--bg);color:var(--ink);
-    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:14px;line-height:1.45}
+    font-family:var(--font-primary);font-size:14px;line-height:1.45}
   .wrap{max-width:1240px;margin:0 auto;padding:0 20px}
   header{background:linear-gradient(180deg,#fff,#fdfcfb);border-bottom:1px solid var(--line)}
   .hd{display:flex;align-items:center;gap:16px;padding:15px 0;flex-wrap:wrap}
@@ -59,7 +70,7 @@
   td{padding:11px 10px;border-bottom:1px solid var(--line)}tr:last-child td{border:none}
   .tbl{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}.scroll{overflow-x:auto}
   .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px}
-  .c-red{background:#FBE8E8;color:#b53434}.c-amber{background:#FDF3DC;color:#a97c00}.c-green{background:#E7F4EB;color:#3f8a52}.c-gray{background:#EEF1F6;color:#5a6b86}
+  .c-red{background:#F8DEDE;color:#A11010}.c-amber{background:#FCF1CF;color:#7A5A00}.c-green{background:#E2F1E7;color:#2F6B3A}.c-gray{background:#EEF1F6;color:#5a6b86}
   .bar{height:7px;border-radius:5px;background:#EEEAE4;overflow:hidden;min-width:70px;flex:1}.bar>i{display:block;height:100%;border-radius:5px}
   .note{background:#FFF8F1;border:1px solid #f6d3bd;border-radius:11px;padding:14px 16px;font-size:var(--fs-caption);color:#7a4a2a;margin-top:14px}
   .meth{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;box-shadow:var(--shadow);margin-bottom:16px}
@@ -188,30 +199,34 @@ window.DATA = /*__DATA__*/null;
     const title='<h3>Evolução — uso do app e fichas em dia</h3><p class="sub">'+(state.unit==='all'?'rede':uName(state.unit))+' · acumula com as coletas diárias</p>';
     if(pts.length<2)
       return '<div class="panel">'+title+'<div class="empty" style="border:none;padding:22px 6px">Acumulando histórico — '+pts.length+' dia(s). A curva aparece a partir do 2º dia.</div></div>';
-    return '<div class="panel">'+title+lineChart(pts,[{k:'uso',n:'Uso do app (%)',c:'#8B5CF6'},{k:'emdia',n:'Fichas em dia (%)',c:'#5BAD6F'}])+'</div>';
+    return '<div class="panel">'+title+lineChart(pts,[{k:'uso',n:'Uso do app (%)',c:'#7A5AA8'},{k:'emdia',n:'Fichas em dia (%)',c:'#5BAD6F'}])+'</div>';
   }
 
   function renderGeral(){
     const totAl=sum('totalAlunos');
     const K=[
       {n:'Alunos na base',dot:'#2D2D2D',v:fmt(totAl),s:fmt(sum('totalAlunosAtivos'))+' ativos'},
-      {n:'Uso do App Treino',dot:'#8B5CF6',v:pct(wavg('percUtilizamApp','totalAlunos')),s:'% dos alunos que usam o app'},
+      {n:'Uso do App Treino',dot:'#7A5AA8',v:pct(wavg('percUtilizamApp','totalAlunos')),s:'% dos alunos que usam o app'},
       {n:'Treinos em dia',dot:'#5BAD6F',v:fmt(sum('totalTreinosEmDia')),s:pct(wavg('percentualEmDia','totalAlunos'))+' da base'},
       {n:'Treinos vencidos',dot:'#D64545',v:fmt(sum('totalTreinosVencidos')),s:'a renovar: '+fmt(sum('totalTreinosRenovar'))},
-      {n:'Avaliações realizadas',dot:'#3E7CB1',v:fmt(sum('avaliacoesRealizadas')),s:'últimos 12 meses'},
-      {n:'Avaliações vencidas',dot:'#F0A500',v:fmt(sum('avaliacoesAtrasadas')),s:'atrasadas / reavaliar'},
+      {n:'Avaliações realizadas',dot:'#3E6DAA',v:fmt(sum('avaliacoesRealizadas')),s:'últimos 12 meses'},
+      {n:'Avaliações vencidas',dot:'#F2C94C',v:fmt(sum('avaliacoesAtrasadas')),s:'atrasadas / reavaliar'},
       {n:'Atendimento (professores)',dot:'#0EA5A0',v:fmt(sum('acompanhamentoEm')),s:'alunos em acompanhamento'},
       {n:'Tempo médio de ficha',dot:'#E8521A',v:fmt(wavg('tempoMedioPermanenciaTreino','totalAlunos')),s:'dias de permanência (média)'},
     ];
     let h='<div class="sec">'+(state.unit==='all'?'Panorama da rede':'Unidade: '+uName(state.unit))+'</div><div class="kgrid">';
     h+=K.map(c=>`<div class="kpi"><div class="n"><span class="dot" style="background:${c.dot}"></span>${c.n}</div><div class="v">${c.v}</div><div class="s">${c.s}</div></div>`).join('')+'</div>';
     h+=indiceHero();
-    if(D.alunos && D.alunos.length){ h+='<div class="sec">Modalidade</div>'+modPanel(crmBase()); }
+    if(D.alunos && D.alunos.length){
+      const alvo=crmBase().length, base=crmBaseFull().length;
+      h+='<div class="sec">Modalidade</div>'+modPanel(crmBaseFull())
+        +`<p class="sub" style="margin:8px 2px 0">Público-alvo do App Treino = planos com <b>Fitness</b> (Fitness · Ambos Água+Fitness · Ambos Fitness+Luta · Ambos Água+Fitness+Luta): <b>${fmt(alvo)}</b> de ${fmt(base)} ativos. As métricas de uso do app (faixas, Score, fila) consideram só esse público.</p>`;
+    }
     h+='<div class="sec">Gráficos</div><div class="grid2">';
     h+='<div class="panel"><h3>Uso do app por unidade</h3><p class="sub">% de alunos que usam o App Treino</p>'
-       +hbars(ALL.map(u=>({label:u.nome,value:N(u.percUtilizamApp)})),'#8B5CF6',v=>pct(v))+'</div>';
+       +hbars(ALL.map(u=>({label:u.nome,value:N(u.percUtilizamApp)})),'#7A5AA8',v=>pct(v))+'</div>';
     h+='<div class="panel"><h3>Situação das fichas</h3><p class="sub">na seleção atual</p>'
-       +donut([{label:'Em dia',value:sum('totalTreinosEmDia'),color:'#5BAD6F'},{label:'Vencidas',value:sum('totalTreinosVencidos'),color:'#D64545'},{label:'A renovar',value:sum('totalTreinosRenovar'),color:'#F0A500'}])+'</div>';
+       +donut([{label:'Em dia',value:sum('totalTreinosEmDia'),color:'#5BAD6F'},{label:'Vencidas',value:sum('totalTreinosVencidos'),color:'#D64545'},{label:'A renovar',value:sum('totalTreinosRenovar'),color:'#F2C94C'}])+'</div>';
     h+='<div class="panel"><h3>Treinos vencidos por unidade</h3><p class="sub">fichas a renovar</p>'
        +hbars(ALL.map(u=>({label:u.nome,value:N(u.totalTreinosVencidos)})),'#D64545',v=>fmt(v))+'</div>';
     h+=histPanel();
@@ -228,7 +243,7 @@ window.DATA = /*__DATA__*/null;
     return '<div class="sec">Índice de engajamento (0–100)</div>'
       +'<div class="panel"><div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">'
       +`<div style="text-align:center;min-width:90px"><div style="font-size:44px;font-weight:800;line-height:1;color:${scoreCol(avg)}">${avg}</div><div style="color:#8A8A8A;font-size:12px;margin-top:5px">índice médio</div></div>`
-      +`<div style="flex:1;min-width:230px"><div class="stack"><i style="width:${hi/tot*100}%;background:#5BAD6F"></i><i style="width:${md/tot*100}%;background:#F0A500"></i><i style="width:${lo/tot*100}%;background:#D64545"></i></div>`
+      +`<div style="flex:1;min-width:230px"><div class="stack"><i style="width:${hi/tot*100}%;background:#5BAD6F"></i><i style="width:${md/tot*100}%;background:#F2C94C"></i><i style="width:${lo/tot*100}%;background:#D64545"></i></div>`
       +`<div style="display:flex;gap:16px;margin-top:8px;font-size:12px;color:#6a6a6a;flex-wrap:wrap"><span><b style="color:#3f8a52">■</b> Alto (≥70) ${fmt(hi)}</span><span><b style="color:#a97c00">■</b> Médio (45–69) ${fmt(md)}</span><span><b style="color:#b53434">■</b> Baixo (&lt;45) ${fmt(lo)}</span></div>`
       +`<div style="color:#8A8A8A;font-size:11.5px;margin-top:7px">Score por aluno = uso do app + faz treino + saúde do contrato. Fila de ações na aba <b>Score &amp; Ações</b>.</div></div>`
       +'</div></div>';
@@ -351,7 +366,7 @@ window.DATA = /*__DATA__*/null;
   // ---------- Modalidade (7 baldes, via contrato) ----------
   const MOD_ORDER=['Fitness','Agua','Luta','Ambos (Agua+Fitness)','Ambos (Agua+Luta)','Ambos (Fitness+Luta)','Ambos (Agua+Fitness+Luta)','Outros'];
   const MOD_LABEL={'Fitness':'Fitness','Agua':'Água','Luta':'Luta','Ambos (Agua+Fitness)':'Ambos · Água+Fitness','Ambos (Agua+Luta)':'Ambos · Água+Luta','Ambos (Fitness+Luta)':'Ambos · Fitness+Luta','Ambos (Agua+Fitness+Luta)':'Ambos · Água+Fitness+Luta','Outros':'Outros'};
-  const MOD_COLOR={'Fitness':'#E8521A','Agua':'#3E7CB1','Luta':'#8B5CF6','Ambos (Agua+Fitness)':'#5BAD6F','Ambos (Agua+Luta)':'#0EA5A0','Ambos (Fitness+Luta)':'#F0A500','Ambos (Agua+Fitness+Luta)':'#2D8F5A','Outros':'#8A8A8A'};
+  const MOD_COLOR={'Fitness':'#E8521A','Agua':'#3E6DAA','Luta':'#7A5AA8','Ambos (Agua+Fitness)':'#5BAD6F','Ambos (Agua+Luta)':'#0EA5A0','Ambos (Fitness+Luta)':'#F2C94C','Ambos (Agua+Fitness+Luta)':'#2D8F5A','Outros':'#8A8A8A'};
   const modKey = a => MOD_ORDER.includes(a&&a.modalidade)?a.modalidade:'Outros';
   function modPill(m){ const k=MOD_ORDER.includes(m)?m:'Outros'; const c=MOD_COLOR[k]; return `<span class="pill" style="background:${c}22;color:${c}">${MOD_LABEL[k]}</span>`; }
   function modDist(list){ const d={}; MOD_ORDER.forEach(k=>d[k]=0); list.forEach(a=>{d[modKey(a)]++;}); return d; }
@@ -365,7 +380,11 @@ window.DATA = /*__DATA__*/null;
     h+='</div>'; return h;
   }
 
-  const crmBase = () => (D.alunos||[]).filter(a=> state.unit==='all' || a.unit===state.unit);
+  // Público-alvo do App Treino = plano que CONTÉM Fitness (Fitness, Ambos A+F, F+L, A+F+L).
+  // Água só, Luta só, Ambos(Água+Luta) e Outros ficam de fora — não usariam o app.
+  const ELEG = a => /Fitness/i.test(String(a && a.modalidade || ''));
+  const crmBaseFull = () => (D.alunos||[]).filter(a=> state.unit==='all' || a.unit===state.unit);
+  const crmBase = () => crmBaseFull().filter(ELEG);   // base das métricas do app = público-alvo
   function crmFiltered(){
     let A=crmBase();
     if(state.crmFaixa!=='all') A=A.filter(a=>a.faixa===state.crmFaixa);
@@ -385,7 +404,7 @@ window.DATA = /*__DATA__*/null;
     const showUnit = state.unit==='all';
     let h='<div class="tbl"><div class="scroll"><table><thead><tr><th>Aluno</th>'
       +(showUnit?'<th>Unidade</th>':'')+'<th>Professor</th><th>Modalidade</th><th>Faz treino</th><th>Usa o app</th><th>Contrato</th><th>Faixa</th><th>Score</th></tr></thead><tbody>';
-    if(!rows.length){ h+=`<tr><td colspan="${showUnit?9:8}"><div class="empty" style="border:none;padding:26px">Nenhum aluno nesta combinação de filtros.</div></td></tr>`; }
+    if(!rows.length){ h+=`<tr><td colspan="${showUnit?9:8}"><div class="empty" style="border:none;padding:26px">Nenhum aluno para estes filtros. Tente ampliar a seleção.</div></td></tr>`; }
     rows.forEach(a=>{ const f=FA[a.faixa]||['—','']; h+=`<tr>
       <td><div class="aluno-cell">${avatar(a)}<div><div class="nm">${esc(a.nome)||'—'}</div><div class="ct">${esc(a.email||'')}${a.telefone?(a.email?' · ':'')+esc(a.telefone):''}</div></div></div></td>`
       +(showUnit?`<td>${esc(a.unitNome)}</td>`:'')
@@ -402,24 +421,27 @@ window.DATA = /*__DATA__*/null;
     const el=document.getElementById('v-crm');
     if(!D.alunos || !D.alunos.length){ el.innerHTML='<div class="empty" style="margin-top:20px"><b>CRM por aluno disponível após a próxima coleta.</b><br>Rode o workflow "Coleta + Publica" com deploy=true para popular a carteira.</div>'; return; }
     const B=crmBase();
+    const Bf=crmBaseFull();
+    const fora=Bf.length-B.length;   // fora do público-alvo (Água/Luta só, Outros)
     const nApp=B.filter(a=>a.usaApp===true).length;
     const nFaz=B.filter(a=>a.fazTreino===true).length;
     const ne=B.filter(a=>a.faixa==='engajado').length, nm=B.filter(a=>a.faixa==='morno').length, nr=B.filter(a=>a.faixa==='risco').length;
     const tot=B.length||1;
     let h='<div class="sec">CRM 360º por aluno — '+(state.unit==='all'?'rede':uName(state.unit))+'</div>';
     h+='<div class="kgrid">'
-      +`<div class="kpi"><div class="n"><span class="dot" style="background:#2D2D2D"></span>Alunos ativos</div><div class="v">${fmt(B.length)}</div><div class="s">situação ATIVO</div></div>`
+      +`<div class="kpi"><div class="n"><span class="dot" style="background:#E8521A"></span>Público-alvo</div><div class="v">${fmt(B.length)}</div><div class="s">de ${fmt(Bf.length)} ativos · planos com Fitness</div></div>`
       +`<div class="kpi"><div class="n"><span class="dot" style="background:#0EA5A0"></span>Faz treino</div><div class="v">${fmt(nFaz)}</div><div class="s">${pct(nFaz/tot*100)} — elegível ao app</div></div>`
-      +`<div class="kpi"><div class="n"><span class="dot" style="background:#8B5CF6"></span>Usam o app</div><div class="v">${pct(nApp/tot*100)}</div><div class="s">${fmt(nApp)} de ${fmt(B.length)} alunos</div></div>`
+      +`<div class="kpi"><div class="n"><span class="dot" style="background:#7A5AA8"></span>Usam o app</div><div class="v">${pct(nApp/tot*100)}</div><div class="s">${fmt(nApp)} de ${fmt(B.length)} alunos</div></div>`
       +`<div class="kpi"><div class="n"><span class="dot" style="background:#5BAD6F"></span>Engajados</div><div class="v">${fmt(ne)}</div><div class="s">usam o app + contrato ok</div></div>`
       +`<div class="kpi"><div class="n"><span class="dot" style="background:#D64545"></span>Em risco</div><div class="v">${fmt(nr)}</div><div class="s">não usam o app + contrato vencendo</div></div>`
       +'</div>';
     h+='<div class="panel" style="margin-top:14px"><h3>Distribuição por faixa</h3><p class="sub">na seleção atual — clique nos filtros abaixo para detalhar</p>'
-      +`<div class="stack"><i style="width:${ne/tot*100}%;background:#5BAD6F"></i><i style="width:${nm/tot*100}%;background:#F0A500"></i><i style="width:${nr/tot*100}%;background:#D64545"></i></div>`
+      +`<div class="stack"><i style="width:${ne/tot*100}%;background:#5BAD6F"></i><i style="width:${nm/tot*100}%;background:#F2C94C"></i><i style="width:${nr/tot*100}%;background:#D64545"></i></div>`
       +`<div style="display:flex;gap:16px;margin-top:8px;font-size:12px;color:#6a6a6a;flex-wrap:wrap">
         <span><b style="color:#3f8a52">■</b> Engajado ${fmt(ne)}</span><span><b style="color:#a97c00">■</b> Morno ${fmt(nm)}</span><span><b style="color:#b53434">■</b> Em risco ${fmt(nr)}</span></div></div>`;
-    // distribuição por modalidade (7 baldes)
-    h+='<div style="margin-top:14px">'+modPanel(B)+'</div>';
+    // distribuição por modalidade (público-alvo)
+    h+='<div style="margin-top:14px">'+modPanel(B)
+      +`<p class="sub" style="margin:8px 2px 0">Base = <b>público-alvo do App Treino</b> (planos com Fitness). Fora: <b>${fmt(fora)}</b> alunos (Água/Luta só, Outros) — não entram nas métricas de uso do app.</p></div>`;
     // filtro modalidade
     const modChips=[['all','Todas']].concat(MOD_ORDER.filter(k=>B.some(a=>modKey(a)===k)).map(k=>[k,MOD_LABEL[k]]));
     h+='<div class="subf"><span class="flab">Modalidade</span>'+modChips.map(m=>`<button class="chip cm ${state.crmMod===m[0]?'on':''}" data-m="${esc(m[0])}">${m[1]}</button>`).join('')+'</div>';
@@ -433,7 +455,7 @@ window.DATA = /*__DATA__*/null;
     // busca
     h+='<div class="subf"><span class="flab">Buscar</span><input class="srch" id="crmSearch" type="text" placeholder="nome do aluno…" value="'+esc(state.crmQ||'')+'"></div>';
     h+='<div id="crmResults" style="margin-top:12px"></div>';
-    h+='<div class="note"><b>Como lemos a faixa (dados reais disponíveis):</b> <b>Engajado</b> = usa o App Treino e contrato vigente; <b>Morno</b> = usa o app mas contrato a vencer, ou não usa mas contrato ok; <b>Em risco</b> = não usa o app e contrato vencendo/vencido. Base: <b>alunos ativos</b> (situação = ATIVO) via <code>/clientes/simples</code> + uso do app via <code>/psec/alunos/alunoApp</code>. <b>Faz treino</b> = aluno vinculado a um <b>professor de treino</b> (via <code>/v1/cliente.vinculos</code> cruzado com <code>bi-professores-vinculos</code>) — é o corte de elegibilidade ao App Treino. <b>Modalidade</b> (Fitness/Água/Luta/Ambos, 7 baldes) vem da descrição do plano em <code>/v1/contrato/matricula/{matricula}</code>. O "treino em dia" por aluno ainda depende de endpoint indisponível.</div>';
+    h+='<div class="note"><b>Como lemos a faixa (dados reais disponíveis):</b> <b>Engajado</b> = usa o App Treino e contrato vigente; <b>Morno</b> = usa o app mas contrato a vencer, ou não usa mas contrato ok; <b>Em risco</b> = não usa o app e contrato vencendo/vencido. Base desta aba: <b>público-alvo do App Treino</b> = ativos (situação = ATIVO) com <b>plano de Fitness</b> (via <code>/clientes/simples</code> + modalidade do contrato); uso do app via <code>/psec/alunos/alunoApp</code>. <b>Faz treino</b> = aluno vinculado a um <b>professor de treino</b> (via <code>/v1/cliente.vinculos</code> cruzado com <code>bi-professores-vinculos</code>) — é o corte de elegibilidade ao App Treino. <b>Modalidade</b> (Fitness/Água/Luta/Ambos, 7 baldes) vem da descrição do plano em <code>/v1/contrato/matricula/{matricula}</code>. O "treino em dia" por aluno ainda depende de endpoint indisponível.</div>';
     el.innerHTML=h;
     el.querySelectorAll('.chip.cf').forEach(b=>b.onclick=()=>{ state.crmFaixa=b.dataset.f; state.crmPage=1; renderCRM(); });
     el.querySelectorAll('.chip.cp').forEach(b=>b.onclick=()=>{ state.crmPub=b.dataset.p; state.crmPage=1; renderCRM(); });
@@ -458,8 +480,8 @@ window.DATA = /*__DATA__*/null;
   const INIS = {
     reativar: {t:'Reativar contrato',    ac:'Contato de retenção / renovação',       c:'#D64545'},
     retencao: {t:'Retenção (em risco)',  ac:'Ligar + reengajar no app',              c:'#D64545'},
-    instalar: {t:'Instalar o App Treino',ac:'Onboarding do app na próxima visita',    c:'#8B5CF6'},
-    renovar:  {t:'Renovação antecipada', ac:'Oferecer renovação (contrato ≤30d)',     c:'#F0A500'},
+    instalar: {t:'Instalar o App Treino',ac:'Onboarding do app na próxima visita',    c:'#7A5AA8'},
+    renovar:  {t:'Renovação antecipada', ac:'Oferecer renovação (contrato ≤30d)',     c:'#F2C94C'},
   };
   function iniDe(a){
     const d=a.diasContrato;
@@ -507,19 +529,19 @@ window.DATA = /*__DATA__*/null;
     const cnt={}; Object.keys(INIS).forEach(k=>cnt[k]=0); fila.forEach(x=>cnt[x.ini]++);
     const avg=Math.round(B.reduce((s,a)=>s+scoreAluno(a),0)/(B.length||1));
     const vol=[
-      {t:'Não usam o App Treino',         n:B.filter(a=>a.usaApp===false).length,        ac:'Campanha de instalação/onboarding do app', c:'#8B5CF6'},
+      {t:'Não usam o App Treino',         n:B.filter(a=>a.usaApp===false).length,        ac:'Campanha de instalação/onboarding do app', c:'#7A5AA8'},
       {t:'Não fazem treino (sem vínculo)',n:B.filter(a=>a.fazTreino===false).length,      ac:'Encaminhar para prescrição com professor',  c:'#0EA5A0'},
       {t:'Contrato vencido',              n:B.filter(a=>a.diasContrato!=null&&a.diasContrato<0).length, ac:'Reativação / renovação', c:'#D64545'},
       {t:'Alunos em risco',               n:B.filter(a=>a.faixa==='risco').length,        ac:'Contato de retenção',                       c:'#D64545'},
-      {t:'Contrato vence em ≤30d',        n:B.filter(a=>a.diasContrato!=null&&a.diasContrato>=0&&a.diasContrato<=30).length, ac:'Renovação antecipada', c:'#F0A500'},
+      {t:'Contrato vence em ≤30d',        n:B.filter(a=>a.diasContrato!=null&&a.diasContrato>=0&&a.diasContrato<=30).length, ac:'Renovação antecipada', c:'#F2C94C'},
     ].sort((x,y)=>y.n-x.n);
     const maxVol=Math.max(1,...vol.map(v=>v.n));
     let h='<div class="sec">Score &amp; Ações — '+(state.unit==='all'?'rede':uName(state.unit))+'</div>';
     h+='<div class="kgrid" style="grid-template-columns:repeat(4,1fr)">'
       +`<div class="kpi"><div class="n"><span class="dot" style="background:#E8521A"></span>Índice médio</div><div class="v">${avg}</div><div class="s">score 0–100 da seleção</div></div>`
       +`<div class="kpi"><div class="n"><span class="dot" style="background:#D64545"></span>Na fila de ação</div><div class="v">${fmt(fila.length)}</div><div class="s">alunos que pedem ação agora</div></div>`
-      +`<div class="kpi"><div class="n"><span class="dot" style="background:#8B5CF6"></span>Instalar o app</div><div class="v">${fmt(cnt.instalar)}</div><div class="s">fazem treino e não usam o app</div></div>`
-      +`<div class="kpi"><div class="n"><span class="dot" style="background:#F0A500"></span>Renovar (≤30d)</div><div class="v">${fmt(cnt.renovar)}</div><div class="s">contrato vencendo</div></div>`
+      +`<div class="kpi"><div class="n"><span class="dot" style="background:#7A5AA8"></span>Instalar o app</div><div class="v">${fmt(cnt.instalar)}</div><div class="s">fazem treino e não usam o app</div></div>`
+      +`<div class="kpi"><div class="n"><span class="dot" style="background:#F2C94C"></span>Renovar (≤30d)</div><div class="v">${fmt(cnt.renovar)}</div><div class="s">contrato vencendo</div></div>`
       +'</div>';
     h+='<div class="panel" style="margin-top:16px"><h3>Ações priorizadas por volume</h3><p class="sub">o que dá mais resultado primeiro — nº de alunos impactados na seleção</p>';
     h+=vol.map(v=>`<div style="display:flex;align-items:center;gap:12px;margin:11px 0">
