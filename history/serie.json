@@ -181,16 +181,16 @@
    "emDiaPct": 61.4,
    "vencidos": 921,
    "avalVencidas": 500,
-   "ativos": 5013,
+   "ativos": 5000,
    "engajado": 1113,
-   "morno": 3539,
-   "risco": 361,
+   "morno": 3527,
+   "risco": 360,
    "semdado": 0,
    "appSim": 1214,
-   "appNao": 3799,
+   "appNao": 3786,
    "appFalha": 0,
-   "fazTreino": 3170,
-   "naoFazTreino": 1306
+   "fazTreino": 3229,
+   "naoFazTreino": 1385
   },
   "unidades": [
    {
