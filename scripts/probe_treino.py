@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""probe v17 — a MODALIDADE (Fitness/Ambos/Agua/Lutas) esta disponivel na API?
-Testa as duas fontes que a base de conhecimento do dashboard de Frequencia aponta:
-  1) campo `categoria` em /clientes/simples (ja sabemos que veio vazio — reconfirma)
-  2) campo `descricao` em /clientes/{matricula}/dados-pessoais  (o que falta cravar)
-Aplica o MESMO classify_grupo do dashboard de Frequencia e reporta a distribuicao.
-PII-safe: imprime SO contagens, o TEXTO DE MODALIDADE (plano, nao e dado pessoal)
-e a categoria resultante. NUNCA imprime cpf, nome, nascimento."""
+"""probe v18 — CATALOGO de modalidades/planos/categorias.
+Em vez de olhar aluno a aluno, varre endpoints candidatos de catalogo e lista os
+NOMES de modalidades/planos disponiveis no sistema (com a categoria Fitness/Agua/
+Ambos/Lutas que o classify_grupo atribuiria a cada nome).
+PII-safe: catalogo (nomes de plano/modalidade) nao e dado pessoal."""
 import os, sys, json, unicodedata, urllib.request, urllib.error, urllib.parse
 BASE = "https://apigw.pactosolucoes.com.br"
 KEYS = [("716NORTE","PACTO_KEY_716NORTE"),("905SUL","PACTO_KEY_905SUL"),
         ("604NORTE","PACTO_KEY_604NORTE"),("LAGONORTE","PACTO_KEY_LAGONORTE"),
         ("LAGOSUL","PACTO_KEY_LAGOSUL"),("NATAL","PACTO_KEY_NATAL")]
 
-# ---- classify_grupo (identico ao coletor / dashboard de Frequencia) ----
 def _sa(s): return "".join(c for c in unicodedata.normalize("NFD", str(s or "")) if unicodedata.category(c)!="Mn")
 def _up(s): return _sa(s).upper().strip()
 _AGUA=("NATAC","NATA","HIDRO","BEBE","AQUA")
@@ -43,66 +40,71 @@ def get(key, path, timeout=30):
     except urllib.error.HTTPError as e: return e.code,(e.read().decode("utf-8","replace") if e.fp else "")
     except Exception as ex: return -1,str(ex)[:120]
 
-def content(body):
-    try: j=json.loads(body); return j.get("content", j)
+def as_json(body):
+    try: return json.loads(body)
     except Exception: return None
 
-def sample_ativos(key, alvo=12):
-    """Amostra robusta de ATIVOS (varre paginas; pagina 0 pode vir vazia)."""
-    out=[]
-    for pg in range(0,40):
-        if len(out)>=alvo: break
-        c=content(get(key,"/clientes/simples?"+urllib.parse.urlencode({"page":pg,"size":50}))[1])
-        if not isinstance(c,list): continue
-        for x in c:
-            if _up(x.get("situacao"))=="ATIVO":
-                out.append(x)
-                if len(out)>=alvo: break
-    return out
+def listify(j):
+    """Extrai a lista de itens de varias formas de resposta {content:[...]}, [...], {content:{content:[...]}}"""
+    if isinstance(j, list): return j
+    if isinstance(j, dict):
+        c=j.get("content", j)
+        if isinstance(c, list): return c
+        if isinstance(c, dict) and isinstance(c.get("content"), list): return c["content"]
+    return None
 
-def probe_unidade(label, key):
+NAME_FIELDS=("nome","descricao","modalidade","titulo","descricaoModalidade","nomeModalidade",
+             "nomePlano","descricaoPlano","name","label")
+
+def name_of(it):
+    if not isinstance(it, dict): return str(it)[:50]
+    for f in NAME_FIELDS:
+        v=it.get(f)
+        if str(v or "").strip(): return str(v).strip()
+    # senao, mostra as chaves pra debug
+    return "{keys:"+",".join(list(it.keys())[:6])+"}"
+
+CANDIDATOS=[
+    "/modalidades","/modalidade","/v1/modalidade","/v1/modalidades","/psec/modalidades",
+    "/psec/modalidade","/planos","/plano","/v1/plano","/v1/planos","/psec/planos",
+    "/categorias","/categoria","/v1/categoria","/psec/categorias",
+    "/v1/modalidade/listar","/modalidades/listar",
+    "/produtos","/produto","/v1/produto","/servicos","/v1/servico",
+    "/plano/listar","/v1/plano/listar",
+    "/v1/contrato?page=0&size=30",
+]
+
+def probe_catalogo(label, key):
     print("\n================ UNIDADE %s ================" % label, file=sys.stderr)
-    alvos=sample_ativos(key, 12)
-    print("amostra ATIVO: %d" % len(alvos), file=sys.stderr)
-    cat_simples_ok=0
-    # candidatos a "texto de modalidade" dentro do dados-pessoais
-    fill={"categoria":0,"codCategoria":0,"descricao":0}
-    ex_cat=[]; grp_dist={}
-    for it in alvos:
-        mat=it.get("matricula") or it.get("codigoCliente")
-        if str(it.get("categoria") or "").strip(): cat_simples_ok+=1
-        st,body=get(key,"/clientes/%s/dados-pessoais"%urllib.parse.quote(str(mat)))
-        dp=content(body)
-        if isinstance(dp,dict):
-            for f in fill:
-                if str(dp.get(f) or "").strip(): fill[f]+=1
-            cval=dp.get("categoria")
-            if str(cval or "").strip():
-                g=classify_grupo(cval)
-                grp_dist[g]=grp_dist.get(g,0)+1
-                if len(ex_cat)<8: ex_cat.append((str(cval)[:50], str(dp.get("codCategoria") or ""), g))  # rotulo de plano, nao PII
-        else:
-            print("  dados-pessoais status=%s (sem content dict)" % st, file=sys.stderr)
-    print("categoria (em /clientes/simples) preenchida: %d/%d" % (cat_simples_ok,len(alvos)), file=sys.stderr)
-    print("dados-pessoais -> categoria preenchida:   %d/%d" % (fill["categoria"],len(alvos)), file=sys.stderr)
-    print("dados-pessoais -> codCategoria preenchida:%d/%d" % (fill["codCategoria"],len(alvos)), file=sys.stderr)
-    print("dados-pessoais -> descricao preenchida:   %d/%d" % (fill["descricao"],len(alvos)), file=sys.stderr)
-    if ex_cat:
-        print("exemplos (categoria | codCategoria -> grupo):", file=sys.stderr)
-        for c,cc,g in ex_cat: print("   '%s' | cod=%s -> %s" % (c,cc,g), file=sys.stderr)
-    if grp_dist:
-        print("distribuicao de grupo na amostra (via categoria): %s" % grp_dist, file=sys.stderr)
+    achou=False
+    for ep in CANDIDATOS:
+        st,body=get(key,ep)
+        j=as_json(body) if (isinstance(st,int) and 200<=st<300) else None
+        itens=listify(j) if j is not None else None
+        if itens is None:
+            print("  [%s] %s -> (sem lista)" % (str(st).rjust(3), ep), file=sys.stderr)
+            continue
+        achou=True
+        nomes=[]
+        for it in itens:
+            n=name_of(it)
+            if n and n not in nomes: nomes.append(n)
+        print("  [%s] %s -> %d item(ns)" % (str(st).rjust(3), ep, len(itens)), file=sys.stderr)
+        for n in nomes[:40]:
+            print("        - %-42s | %s" % (n[:42], classify_grupo(n)), file=sys.stderr)
+        if len(nomes)>40:
+            print("        ... (+%d)" % (len(nomes)-40), file=sys.stderr)
+    if not achou:
+        print("  (nenhum endpoint de catalogo respondeu com lista)", file=sys.stderr)
 
 def main():
-    feitas=0
-    for label,env in KEYS:      # roda em ate 2 unidades pra ser rapido
+    for label,env in KEYS:      # 1 unidade basta pro catalogo
         k=os.environ.get(env)
         if not k: continue
-        probe_unidade(label,k)
-        feitas+=1
-        if feitas>=2: break
-    if not feitas:
+        probe_catalogo(label,k)
+        break
+    else:
         print("sem chave", file=sys.stderr); sys.exit(1)
-    print("\n>> CONCLUSAO: se 'descricao preenchida' > 0, dá pra classificar Fitness/Ambos/Agua/Lutas.", file=sys.stderr)
+    print("\n>> Se algum endpoint listou modalidades/planos, temos o CATALOGO disponivel.", file=sys.stderr)
 
 if __name__=="__main__": main()
