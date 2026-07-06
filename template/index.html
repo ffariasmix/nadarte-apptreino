@@ -82,6 +82,7 @@
   .pbtn:disabled{opacity:.4;cursor:default}
   .stack{display:flex;height:12px;border-radius:6px;overflow:hidden;margin-top:6px}
   tbody tr.click{cursor:pointer}tbody tr.click:hover{background:var(--soft)}
+  td.muted{color:var(--muted)}
   .modal{position:fixed;top:0;left:0;inset:0;width:100vw;height:100vh;height:100dvh;background:rgba(45,45,45,.45);display:none;align-items:center;justify-content:center;z-index:60;padding:18px;overflow:auto}
   .modal.on{display:flex}
   .modalc{background:#fff;border-radius:16px;max-width:640px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.3);max-height:88vh;overflow:auto;position:relative}
@@ -103,6 +104,7 @@
     <button class="tab" data-v="unidades">Unidades</button>
     <button class="tab" data-v="profs">Professores 360º</button>
     <button class="tab" data-v="crm">CRM 360º (alunos)</button>
+    <button class="tab" data-v="score">Score &amp; Ações</button>
     <button class="tab" data-v="fase2">Fase 2 (roadmap)</button>
     <button class="tab" data-v="metodo">Metodologia &amp; API</button>
   </div>
@@ -112,6 +114,7 @@
   <section class="view" id="v-unidades"></section>
   <section class="view" id="v-profs"></section>
   <section class="view" id="v-crm"></section>
+  <section class="view" id="v-score"></section>
   <section class="view" id="v-fase2"></section>
   <section class="view" id="v-metodo"></section>
 </main>
@@ -133,7 +136,7 @@ window.DATA = /*__DATA__*/null;
   const N = v => Number(v)||0;
   if(D.gerado_em){ try{ document.getElementById('asof').textContent = new Date(D.gerado_em).toLocaleString('pt-BR'); }catch(e){} }
 
-  let state = {unit:'all', tab:'geral', crmFaixa:'all', crmPub:'all', crmQ:'', crmPage:1};
+  let state = {unit:'all', tab:'geral', crmFaixa:'all', crmPub:'all', crmQ:'', crmPage:1, scoreIni:'all', scorePage:1};
   const sel = () => state.unit==='all' ? ALL : ALL.filter(u=>u.id===state.unit);
   const sum = k => sel().reduce((a,u)=>a+N(u[k]),0);
   const wavg = (k,w) => { let n=0,d=0; sel().forEach(u=>{const ww=N(u[w]); if(u[k]!=null){n+=Number(u[k])*ww; d+=ww;}}); return d?n/d:null; };
@@ -202,6 +205,7 @@ window.DATA = /*__DATA__*/null;
     ];
     let h='<div class="sec">'+(state.unit==='all'?'Panorama da rede':'Unidade: '+uName(state.unit))+'</div><div class="kgrid">';
     h+=K.map(c=>`<div class="kpi"><div class="n"><span class="dot" style="background:${c.dot}"></span>${c.n}</div><div class="v">${c.v}</div><div class="s">${c.s}</div></div>`).join('')+'</div>';
+    h+=indiceHero();
     h+='<div class="sec">Gráficos</div><div class="grid2">';
     h+='<div class="panel"><h3>Uso do app por unidade</h3><p class="sub">% de alunos que usam o App Treino</p>'
        +hbars(ALL.map(u=>({label:u.nome,value:N(u.percUtilizamApp)})),'#8B5CF6',v=>pct(v))+'</div>';
@@ -215,6 +219,19 @@ window.DATA = /*__DATA__*/null;
     document.getElementById('v-geral').innerHTML=h;
   }
   function uName(id){return (ALL.find(u=>u.id===id)||{}).nome||id;}
+  function indiceHero(){
+    if(!D.alunos || !D.alunos.length) return '';
+    const B=crmBase(); const tot=B.length||1;
+    const avg=Math.round(B.reduce((s,a)=>s+scoreAluno(a),0)/tot);
+    const hi=B.filter(a=>scoreAluno(a)>=70).length, md=B.filter(a=>{const v=scoreAluno(a);return v>=45&&v<70;}).length, lo=B.filter(a=>scoreAluno(a)<45).length;
+    return '<div class="sec">Índice de engajamento (0–100)</div>'
+      +'<div class="panel"><div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">'
+      +`<div style="text-align:center;min-width:90px"><div style="font-size:44px;font-weight:800;line-height:1;color:${scoreCol(avg)}">${avg}</div><div style="color:#8A8A8A;font-size:12px;margin-top:5px">índice médio</div></div>`
+      +`<div style="flex:1;min-width:230px"><div class="stack"><i style="width:${hi/tot*100}%;background:#5BAD6F"></i><i style="width:${md/tot*100}%;background:#F0A500"></i><i style="width:${lo/tot*100}%;background:#D64545"></i></div>`
+      +`<div style="display:flex;gap:16px;margin-top:8px;font-size:12px;color:#6a6a6a;flex-wrap:wrap"><span><b style="color:#3f8a52">■</b> Alto (≥70) ${fmt(hi)}</span><span><b style="color:#a97c00">■</b> Médio (45–69) ${fmt(md)}</span><span><b style="color:#b53434">■</b> Baixo (&lt;45) ${fmt(lo)}</span></div>`
+      +`<div style="color:#8A8A8A;font-size:11.5px;margin-top:7px">Score por aluno = uso do app + faz treino + saúde do contrato. Fila de ações na aba <b>Score &amp; Ações</b>.</div></div>`
+      +'</div></div>';
+  }
 
   function renderUnidades(){
     let h='<div class="sec">Unidades</div><div class="ugrid">';
@@ -349,13 +366,13 @@ window.DATA = /*__DATA__*/null;
     const start=(state.crmPage-1)*PER, rows=A.slice(start,start+PER);
     const showUnit = state.unit==='all';
     let h='<div class="tbl"><div class="scroll"><table><thead><tr><th>Aluno</th>'
-      +(showUnit?'<th>Unidade</th>':'')+'<th>Professor</th><th>Faz treino</th><th>Usa o app</th><th>Contrato</th><th>Faixa</th></tr></thead><tbody>';
-    if(!rows.length){ h+=`<tr><td colspan="${showUnit?7:6}"><div class="empty" style="border:none;padding:26px">Nenhum aluno nesta combinação de filtros.</div></td></tr>`; }
+      +(showUnit?'<th>Unidade</th>':'')+'<th>Professor</th><th>Faz treino</th><th>Usa o app</th><th>Contrato</th><th>Faixa</th><th>Score</th></tr></thead><tbody>';
+    if(!rows.length){ h+=`<tr><td colspan="${showUnit?8:7}"><div class="empty" style="border:none;padding:26px">Nenhum aluno nesta combinação de filtros.</div></td></tr>`; }
     rows.forEach(a=>{ const f=FA[a.faixa]||['—','']; h+=`<tr>
       <td><div class="aluno-cell">${avatar(a)}<div><div class="nm">${esc(a.nome)||'—'}</div><div class="ct">${esc(a.email||'')}${a.telefone?(a.email?' · ':'')+esc(a.telefone):''}</div></div></div></td>`
       +(showUnit?`<td>${esc(a.unitNome)}</td>`:'')
       +`<td class="muted">${esc(a.professor)||'—'}</td><td>${fazPill(a.fazTreino)}</td><td>${appPill(a.usaApp)}</td><td>${contratoPill(a.diasContrato)}</td>
-      <td><span class="pill ${f[1]}">${f[0]}</span></td></tr>`; });
+      <td><span class="pill ${f[1]}">${f[0]}</span></td><td>${scorePill(scoreAluno(a))}</td></tr>`; });
     h+='</tbody></table></div>';
     h+=`<div class="pager"><span style="color:#8A8A8A;font-size:12.5px">${fmt(A.length)} aluno(s) · página ${state.crmPage} de ${pages}</span>
       <span style="display:flex;gap:8px"><button class="pbtn" data-p="prev" ${state.crmPage<=1?'disabled':''}>‹ Anterior</button>
@@ -402,11 +419,105 @@ window.DATA = /*__DATA__*/null;
     renderCRMResults();
   }
 
+  // ---------- Score 0–100 + Score & Ações ----------
+  function scoreAluno(a){
+    let s=0;
+    s += a.usaApp===true?40:(a.usaApp==null?15:0);
+    s += a.fazTreino===true?30:(a.fazTreino==null?10:0);
+    const d=a.diasContrato;
+    s += (d==null||d>90)?30:(d>30?22:(d>0?12:0));
+    return Math.max(0,Math.min(100,Math.round(s)));
+  }
+  function scoreCol(v){return v>=70?'#3f8a52':v>=45?'#a97c00':'#b53434';}
+  function scoreBg(v){return v>=70?'#E7F4EB':v>=45?'#FDF3DC':'#FBE8E8';}
+  function scorePill(v){return `<span class="pill" style="background:${scoreBg(v)};color:${scoreCol(v)}">${v}</span>`;}
+  const INIS = {
+    reativar: {t:'Reativar contrato',    ac:'Contato de retenção / renovação',       c:'#D64545'},
+    retencao: {t:'Retenção (em risco)',  ac:'Ligar + reengajar no app',              c:'#D64545'},
+    instalar: {t:'Instalar o App Treino',ac:'Onboarding do app na próxima visita',    c:'#8B5CF6'},
+    renovar:  {t:'Renovação antecipada', ac:'Oferecer renovação (contrato ≤30d)',     c:'#F0A500'},
+  };
+  function iniDe(a){
+    const d=a.diasContrato;
+    if(d!=null && d<0) return 'reativar';
+    if(a.faixa==='risco' && a.usaApp!==true) return 'retencao';
+    if(a.fazTreino===true && a.usaApp!==true) return 'instalar';
+    if(d!=null && d>=0 && d<=30) return 'renovar';
+    return null;
+  }
+  function scoreFila(){
+    let f=crmBase().map(a=>({a,ini:iniDe(a),sc:scoreAluno(a)})).filter(x=>x.ini);
+    if(state.scoreIni!=='all') f=f.filter(x=>x.ini===state.scoreIni);
+    const ord={reativar:0,retencao:1,instalar:2,renovar:3};
+    f.sort((x,y)=> (x.sc-y.sc) || (ord[x.ini]-ord[y.ini]));
+    return f;
+  }
+  function renderScoreResults(){
+    const box=document.getElementById('scoreResults'); if(!box) return;
+    const F=scoreFila(); const pages=Math.max(1,Math.ceil(F.length/PER));
+    if(state.scorePage>pages) state.scorePage=pages; if(state.scorePage<1) state.scorePage=1;
+    const start=(state.scorePage-1)*PER, rows=F.slice(start,start+PER);
+    const showUnit=state.unit==='all';
+    let h='<div class="tbl"><div class="scroll"><table><thead><tr><th>Aluno</th>'
+      +(showUnit?'<th>Unidade</th>':'')+'<th>Professor</th><th>Motivo</th><th>Ação sugerida</th><th>Score</th></tr></thead><tbody>';
+    if(!rows.length){ h+=`<tr><td colspan="${showUnit?6:5}"><div class="empty" style="border:none;padding:26px">Sem alunos nesta iniciativa. 🎉</div></td></tr>`; }
+    rows.forEach(x=>{ const a=x.a, I=INIS[x.ini]; h+=`<tr>
+      <td><div class="aluno-cell">${avatar(a)}<div><div class="nm">${esc(a.nome)||'—'}</div><div class="ct">${esc(a.email||'')}</div></div></div></td>`
+      +(showUnit?`<td class="muted">${esc(a.unitNome)}</td>`:'')
+      +`<td class="muted">${esc(a.professor)||'—'}</td>
+      <td><span class="pill" style="background:#F1F0EC;color:${I.c}">${I.t}</span></td>
+      <td style="font-size:12.5px;color:#5a5a5a">${I.ac}</td>
+      <td>${scorePill(x.sc)}</td></tr>`; });
+    h+='</tbody></table></div>';
+    h+=`<div class="pager"><span style="color:#8A8A8A;font-size:12.5px">${fmt(F.length)} aluno(s) na fila · página ${state.scorePage} de ${pages}</span>
+      <span style="display:flex;gap:8px"><button class="pbtn" data-p="prev" ${state.scorePage<=1?'disabled':''}>‹ Anterior</button>
+      <button class="pbtn" data-p="next" ${state.scorePage>=pages?'disabled':''}>Próxima ›</button></span></div></div>`;
+    box.innerHTML=h;
+    box.querySelectorAll('.pbtn').forEach(b=>b.onclick=()=>{ state.scorePage+=(b.dataset.p==='next'?1:-1); renderScoreResults(); window.scrollTo({top:0,behavior:'smooth'}); });
+  }
+  function renderScore(){
+    const el=document.getElementById('v-score');
+    if(!D.alunos || !D.alunos.length){ el.innerHTML='<div class="empty" style="margin-top:20px"><b>Score &amp; Ações disponível após a próxima coleta.</b><br>Rode o workflow "Coleta + Publica" com deploy=true.</div>'; return; }
+    const B=crmBase();
+    const fila=B.map(a=>({a,ini:iniDe(a)})).filter(x=>x.ini);
+    const cnt={}; Object.keys(INIS).forEach(k=>cnt[k]=0); fila.forEach(x=>cnt[x.ini]++);
+    const avg=Math.round(B.reduce((s,a)=>s+scoreAluno(a),0)/(B.length||1));
+    const vol=[
+      {t:'Não usam o App Treino',         n:B.filter(a=>a.usaApp===false).length,        ac:'Campanha de instalação/onboarding do app', c:'#8B5CF6'},
+      {t:'Não fazem treino (sem vínculo)',n:B.filter(a=>a.fazTreino===false).length,      ac:'Encaminhar para prescrição com professor',  c:'#0EA5A0'},
+      {t:'Contrato vencido',              n:B.filter(a=>a.diasContrato!=null&&a.diasContrato<0).length, ac:'Reativação / renovação', c:'#D64545'},
+      {t:'Alunos em risco',               n:B.filter(a=>a.faixa==='risco').length,        ac:'Contato de retenção',                       c:'#D64545'},
+      {t:'Contrato vence em ≤30d',        n:B.filter(a=>a.diasContrato!=null&&a.diasContrato>=0&&a.diasContrato<=30).length, ac:'Renovação antecipada', c:'#F0A500'},
+    ].sort((x,y)=>y.n-x.n);
+    const maxVol=Math.max(1,...vol.map(v=>v.n));
+    let h='<div class="sec">Score &amp; Ações — '+(state.unit==='all'?'rede':uName(state.unit))+'</div>';
+    h+='<div class="kgrid" style="grid-template-columns:repeat(4,1fr)">'
+      +`<div class="kpi"><div class="n"><span class="dot" style="background:#E8521A"></span>Índice médio</div><div class="v">${avg}</div><div class="s">score 0–100 da seleção</div></div>`
+      +`<div class="kpi"><div class="n"><span class="dot" style="background:#D64545"></span>Na fila de ação</div><div class="v">${fmt(fila.length)}</div><div class="s">alunos que pedem ação agora</div></div>`
+      +`<div class="kpi"><div class="n"><span class="dot" style="background:#8B5CF6"></span>Instalar o app</div><div class="v">${fmt(cnt.instalar)}</div><div class="s">fazem treino e não usam o app</div></div>`
+      +`<div class="kpi"><div class="n"><span class="dot" style="background:#F0A500"></span>Renovar (≤30d)</div><div class="v">${fmt(cnt.renovar)}</div><div class="s">contrato vencendo</div></div>`
+      +'</div>';
+    h+='<div class="panel" style="margin-top:16px"><h3>Ações priorizadas por volume</h3><p class="sub">o que dá mais resultado primeiro — nº de alunos impactados na seleção</p>';
+    h+=vol.map(v=>`<div style="display:flex;align-items:center;gap:12px;margin:11px 0">
+      <div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">${v.t}</div><div style="color:#8A8A8A;font-size:11.5px">${v.ac}</div></div>
+      <div class="bar" style="max-width:340px"><i style="width:${v.n/maxVol*100}%;background:${v.c}"></i></div>
+      <div style="font-weight:800;font-size:15px;min-width:64px;text-align:right">${fmt(v.n)}</div></div>`).join('');
+    h+='</div>';
+    const chips=[['all','Todas']].concat(Object.keys(INIS).map(k=>[k,INIS[k].t]));
+    h+='<div class="sec">Fila de iniciativas</div>';
+    h+='<div class="subf"><span class="flab">Iniciativa</span>'+chips.map(c=>`<button class="chip si ${state.scoreIni===c[0]?'on':''}" data-i="${c[0]}">${c[1]}</button>`).join('')+'</div>';
+    h+='<div id="scoreResults" style="margin-top:12px"></div>';
+    h+='<div class="note"><b>Score 0–100</b> = uso do app (40) + faz treino/vínculo (30) + saúde do contrato (30). A <b>fila</b> classifica cada aluno pela ação mais urgente (contrato vencido → retenção → instalar app → renovar) e ordena do menor score para o maior. Página com login — por isso exibe nomes/contatos.</div>';
+    el.innerHTML=h;
+    el.querySelectorAll('.chip.si').forEach(b=>b.onclick=()=>{ state.scoreIni=b.dataset.i; state.scorePage=1; renderScore(); });
+    renderScoreResults();
+  }
+
   // filtros + abas
   function renderChips(){
     const chips=[{id:'all',nome:'Todas as unidades'}].concat(ALL.map(u=>({id:u.id,nome:u.nome})));
     document.getElementById('unitChips').innerHTML='<span class="flab">Unidade</span>'+chips.map(c=>`<button class="chip ${state.unit===c.id?'on':''}" data-u="${c.id}">${c.nome}</button>`).join('');
-    document.querySelectorAll('#unitChips .chip').forEach(b=>b.onclick=()=>{state.unit=b.dataset.u; state.crmPage=1; renderChips(); renderGeral(); renderProfs(); renderCRM();});
+    document.querySelectorAll('#unitChips .chip').forEach(b=>b.onclick=()=>{state.unit=b.dataset.u; state.crmPage=1; state.scorePage=1; renderChips(); renderGeral(); renderProfs(); renderCRM(); renderScore();});
   }
   document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
     state.tab=t.dataset.v;
@@ -415,7 +526,7 @@ window.DATA = /*__DATA__*/null;
     document.getElementById('v-'+state.tab).classList.add('on');
   });
   document.getElementById('pmodal').onclick=e=>{ if(e.target.id==='pmodal') document.getElementById('pmodal').classList.remove('on'); };
-  renderChips(); renderGeral(); renderUnidades(); renderProfs(); renderCRM(); renderFase2(); renderMetodo();
+  renderChips(); renderGeral(); renderUnidades(); renderProfs(); renderCRM(); renderScore(); renderFase2(); renderMetodo();
 })();
 </script>
 </body>
