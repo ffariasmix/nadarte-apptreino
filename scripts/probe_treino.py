@@ -65,31 +65,33 @@ def probe_unidade(label, key):
     alvos=sample_ativos(key, 12)
     print("amostra ATIVO: %d" % len(alvos), file=sys.stderr)
     cat_simples_ok=0
-    desc_ok=0; desc_dist={}; exemplos=[]
-    keys_vistos=set()   # nomes de campo do dados-pessoais (sem valores)
+    # candidatos a "texto de modalidade" dentro do dados-pessoais
+    fill={"categoria":0,"codCategoria":0,"descricao":0}
+    ex_cat=[]; grp_dist={}
     for it in alvos:
         mat=it.get("matricula") or it.get("codigoCliente")
         if str(it.get("categoria") or "").strip(): cat_simples_ok+=1
         st,body=get(key,"/clientes/%s/dados-pessoais"%urllib.parse.quote(str(mat)))
         dp=content(body)
         if isinstance(dp,dict):
-            for k in dp.keys(): keys_vistos.add(k)
-            desc=dp.get("descricao")
-            if str(desc or "").strip():
-                desc_ok+=1
-                cat=classify_grupo(desc)
-                desc_dist[cat]=desc_dist.get(cat,0)+1
-                if len(exemplos)<8: exemplos.append((str(desc)[:60], cat))  # modalidade = plano, nao PII
+            for f in fill:
+                if str(dp.get(f) or "").strip(): fill[f]+=1
+            cval=dp.get("categoria")
+            if str(cval or "").strip():
+                g=classify_grupo(cval)
+                grp_dist[g]=grp_dist.get(g,0)+1
+                if len(ex_cat)<8: ex_cat.append((str(cval)[:50], str(dp.get("codCategoria") or ""), g))  # rotulo de plano, nao PII
         else:
             print("  dados-pessoais status=%s (sem content dict)" % st, file=sys.stderr)
-    print("campos vistos em dados-pessoais: %s" % sorted(keys_vistos), file=sys.stderr)
     print("categoria (em /clientes/simples) preenchida: %d/%d" % (cat_simples_ok,len(alvos)), file=sys.stderr)
-    print("descricao (em dados-pessoais) preenchida:    %d/%d" % (desc_ok,len(alvos)), file=sys.stderr)
-    if exemplos:
-        print("exemplos (modalidade -> categoria):", file=sys.stderr)
-        for d,c in exemplos: print("   '%s' -> %s" % (d,c), file=sys.stderr)
-    if desc_dist:
-        print("distribuicao de categoria na amostra: %s" % desc_dist, file=sys.stderr)
+    print("dados-pessoais -> categoria preenchida:   %d/%d" % (fill["categoria"],len(alvos)), file=sys.stderr)
+    print("dados-pessoais -> codCategoria preenchida:%d/%d" % (fill["codCategoria"],len(alvos)), file=sys.stderr)
+    print("dados-pessoais -> descricao preenchida:   %d/%d" % (fill["descricao"],len(alvos)), file=sys.stderr)
+    if ex_cat:
+        print("exemplos (categoria | codCategoria -> grupo):", file=sys.stderr)
+        for c,cc,g in ex_cat: print("   '%s' | cod=%s -> %s" % (c,cc,g), file=sys.stderr)
+    if grp_dist:
+        print("distribuicao de grupo na amostra (via categoria): %s" % grp_dist, file=sys.stderr)
 
 def main():
     feitas=0
