@@ -25,7 +25,6 @@ def snapshot(data):
     emDia = sum(num(u.get("percentualEmDia")) * num(u.get("totalAlunos")) for u in unis) / tot
     al = data.get("alunos", [])
     faixa = lambda f: sum(1 for a in al if a.get("faixa") == f)
-    cat = lambda c: sum(1 for a in al if a.get("categoria") == c)
     return {
         "data": datetime.date.today().isoformat(),
         "rede": {
@@ -34,13 +33,12 @@ def snapshot(data):
             "avalVencidas": int(sum(num(u.get("avaliacoesAtrasadas")) for u in unis)),
             "ativos": len(al), "engajado": faixa("engajado"), "morno": faixa("morno"),
             "risco": faixa("risco"), "semdado": faixa("semdado"),
-            # uso do app por aluno (qualidade da coleta) e publico-alvo (real, via descricao)
+            # uso do app por aluno (qualidade da coleta) e "faz treino" (via vinculo c/ prof.)
             "appSim": sum(1 for a in al if a.get("usaApp") is True),
             "appNao": sum(1 for a in al if a.get("usaApp") is False),
             "appFalha": sum(1 for a in al if a.get("usaApp") is None),
-            "elegiveis": sum(1 for a in al if a.get("elegivel") is True),
-            "publicoAlvo": {"Fitness": cat("Fitness"), "Ambos": cat("Ambos"),
-                            "Agua": cat("Agua"), "LutasEOutros": cat("Lutas e Outros")},
+            "fazTreino": sum(1 for a in al if a.get("fazTreino") is True),
+            "naoFazTreino": sum(1 for a in al if a.get("fazTreino") is False),
         },
         "unidades": [{"id": u.get("id"), "nome": u.get("nome"),
                       "usoApp": round(num(u.get("percUtilizamApp")), 1),

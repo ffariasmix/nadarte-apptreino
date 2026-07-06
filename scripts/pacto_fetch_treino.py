@@ -239,20 +239,28 @@ def usa_app(key, cid):
     except Exception:
         return None
 
-def categoria_aluno(key, matricula):
-    """Publico-alvo do aluno: le `descricao` (modalidades) em dados-pessoais e classifica.
-    Retorna a categoria (Fitness/Ambos/Agua/Lutas e Outros) ou None se a chamada falhar."""
-    if matricula is None:
-        return None
-    st, body = http_get(key, "/clientes/%s/dados-pessoais" % matricula, tries=3, timeout=20)
+def prof_treino(key, cid, treino_codes):
+    """Le /v1/cliente/{cid}.vinculos e devolve (fazTreino, profNome, profCod):
+    fazTreino = aluno vinculado a algum colaborador que e professor de treino
+    (codigo no conjunto `treino_codes`, vindo de bi-professores-vinculos).
+    Modelo confirmado por probe (join colaborador.codigo == professor.id).
+    (fazTreino=None se a chamada falhar)."""
+    st, body = http_get(key, "/v1/cliente/%s" % cid, tries=3, timeout=20)
     if st != 200:
-        return None
+        return (None, None, None)
     try:
         j = json.loads(body); c = j.get("content", j)
-        desc = c.get("descricao") if isinstance(c, dict) else None   # so a modalidade (ignora cpf/PII)
-        return classify_grupo(desc)
+        vinc = c.get("vinculos") if isinstance(c, dict) else None
+        if not isinstance(vinc, list):
+            return (None, None, None)
+        for v in vinc:
+            col = v.get("colaborador") or {}
+            cod = str(col.get("codigo"))
+            if cod in treino_codes:
+                return (True, col.get("nome"), cod)   # 1o professor de treino vinculado
+        return (False, None, None)                    # tem vinculos, mas nenhum professor de treino
     except Exception:
-        return None
+        return (None, None, None)
 
 # ---------------------------------------------------------------- por unidade
 def coleta_unidade(uk, ulabel, key):
@@ -338,7 +346,10 @@ def coleta_unidade(uk, ulabel, key):
         "avaliacoesPrevistas": num(avf, "previstas"),
         "avaliacoesSem": num(avf, "semAvaliacao"),
     }
+    # codigos dos professores de treino desta unidade (p/ o join do vinculo do aluno)
+    treino_codes = set(str(p["id"]) for p in profs if p.get("id") is not None)
     return {"uk": uk, "ulabel": ulabel, "unit": unidade, "profs": profs, "ativos": ativos,
+            "treino_codes": treino_codes,
             "cat_dist": cat_dist, "sit_dist": sit_dist, "sitc_dist": sitc_dist,
             "carteiraTotal": len(carteira), "biTotal": bi_total}
 
@@ -361,36 +372,39 @@ def main():
         list(ex.map(run, UNITS))
 
     # ---- FASE 2: uso do app + categoria numa FILA GLOBAL (concorrencia limitada) ----
-    tarefas = []  # (uk, key, cid, matricula)
+    tcodes = {uk: resultados[uk].get("treino_codes", set()) for uk in resultados}
+    tarefas = []  # (uk, key, cid)
     for uk in sorted(resultados):
         key = keys.get(uk)
         for it in resultados[uk].get("ativos", []):
             cid = it.get("codigoCliente") or it.get("matricula")
-            tarefas.append((uk, key, cid, it.get("matricula")))
-    app_res = {}  # (uk, cid) -> (usaApp True/False/None, categoria/None)
-    n_true = n_false = n_fail = 0
+            tarefas.append((uk, key, cid))
+    app_res = {}  # (uk, cid) -> (usaApp, fazTreino, profNome, profId)
+    n_true = n_false = n_fail = n_treino = 0
     if tarefas and not DIAG:
         def _one(t):
-            uk, key, cid, mat = t
-            # categoria/publico-alvo NAO vem da API (categoria vazio, descricao ausente,
-            # /v1/cliente sem plano, /v1/contrato 500) -> modalidade so na planilha.
-            return (uk, cid, usa_app(key, cid), None)
-        with ThreadPoolExecutor(max_workers=6) as ex:   # <= gentil com a API (1 chamada/aluno)
-            for uk, cid, ua, cat in ex.map(_one, tarefas):
-                app_res[(uk, cid)] = (ua, cat)
+            uk, key, cid = t
+            ua = usa_app(key, cid)                              # 1) usa o app?
+            faz, pnome, pcod = prof_treino(key, cid, tcodes.get(uk, set()))  # 2) faz treino? qual professor?
+            return (uk, cid, ua, faz, pnome, pcod)
+        with ThreadPoolExecutor(max_workers=6) as ex:          # <= gentil com a API (2 chamadas/aluno)
+            for uk, cid, ua, faz, pnome, pcod in ex.map(_one, tarefas):
+                app_res[(uk, cid)] = (ua, faz, pnome, pcod)
         # 2a tentativa (sequencial e leve) so para os que falharam no uso do app
-        faltas = [(uk, key, cid, mat) for (uk, key, cid, mat) in tarefas if app_res.get((uk, cid), (None, None))[0] is None]
+        faltas = [(uk, key, cid) for (uk, key, cid) in tarefas if app_res.get((uk, cid), (None, None, None, None))[0] is None]
         if faltas:
             print("  [app] re-tentando %d chamadas que falharam..." % len(faltas), file=sys.stderr)
-            for uk, key, cid, mat in faltas:
+            for uk, key, cid in faltas:
                 time.sleep(0.12)
-                app_res[(uk, cid)] = (usa_app(key, cid), None)
-        for ua, _cat in app_res.values():
+                prev = app_res.get((uk, cid), (None, None, None, None))
+                app_res[(uk, cid)] = (usa_app(key, cid), prev[1], prev[2], prev[3])
+        for ua, faz, _pn, _pc in app_res.values():
             n_true  += 1 if ua is True else 0
             n_false += 1 if ua is False else 0
             n_fail  += 1 if ua is None else 0
-        print("[app] usaApp -> sim %d | nao %d | falha %d (de %d ativos)"
-              % (n_true, n_false, n_fail, len(tarefas)), file=sys.stderr)
+            n_treino += 1 if faz is True else 0
+        print("[app] usaApp -> sim %d | nao %d | falha %d | fazTreino %d (de %d ativos)"
+              % (n_true, n_false, n_fail, n_treino, len(tarefas)), file=sys.stderr)
 
     # ---- FASE 3: montar alunos + resumo por unidade ----
     for uk in sorted(resultados):
@@ -399,13 +413,14 @@ def main():
         for it in r.get("ativos", []):
             cid = it.get("codigoCliente") or it.get("matricula")
             fim_ms = parse_date_ms(it.get("fimContrato"))
-            ua, cat = app_res.get((uk, cid), (None, None))   # usaApp, categoria(publico-alvo)
+            ua, faz, pnome, pcod = app_res.get((uk, cid), (None, None, None, None))
             faixa = classifica(bool(ua), fim_ms) if ua is not None else "semdado"
             u_alunos.append({
                 "unit": uk, "unitNome": r["ulabel"],
                 "nome": it.get("nome"), "matricula": it.get("matricula"),
                 "foto": it.get("urlFoto"),
-                "categoria": cat, "elegivel": (cat in ELEGIVEIS) if cat else None,
+                "fazTreino": faz, "professor": pnome, "professorId": pcod,
+                "elegivel": faz,   # elegivel ao App Treino = faz treino (vinculo com prof. de treino)
                 "situacao": it.get("situacao"), "situacaoContrato": it.get("situacaoContrato"),
                 "inicioContrato": parse_date_ms(it.get("inicioContrato")), "fimContrato": fim_ms,
                 "diasContrato": round((fim_ms - NOW_MS) / 86400000.0) if fim_ms else None,
@@ -422,7 +437,8 @@ def main():
             "morno": sum(1 for a in u_alunos if a["faixa"] == "morno"),
             "risco": sum(1 for a in u_alunos if a["faixa"] == "risco"),
             "semdado": sum(1 for a in u_alunos if a["faixa"] == "semdado"),
-            "elegiveis": sum(1 for a in u_alunos if a["elegivel"] is True),
+            "fazTreino": sum(1 for a in u_alunos if a["fazTreino"] is True),
+            "naoFazTreino": sum(1 for a in u_alunos if a["fazTreino"] is False),
         }
 
     os.makedirs("data", exist_ok=True)
@@ -443,6 +459,14 @@ def main():
         for sc, n in r.get("sitc_dist", {}).items():
             sitc_total[sc] = sitc_total.get(sc, 0) + n
 
+    # carteira real do professor: nº de alunos ativos vinculados a cada professor
+    cart_por_prof = {}
+    for a in alunos:
+        pid = a.get("professorId")
+        if pid: cart_por_prof[str(pid)] = cart_por_prof.get(str(pid), 0) + 1
+    for p in professores:
+        p["carteiraReal"] = cart_por_prof.get(str(p.get("id")), 0)
+
     out = {"gerado_em": NOW.isoformat() + "Z",
            "unidades": unidades, "professores": professores,
            "alunos": alunos, "categorias": cat_total}
@@ -451,14 +475,15 @@ def main():
 
     # diagnostico (agregado, SEM PII) — versionado no repo para inspecionar sem depender do log
     os.makedirs("history", exist_ok=True)
+    faz = sum(1 for a in alunos if a.get("fazTreino") is True)
+    nfaz = sum(1 for a in alunos if a.get("fazTreino") is False)
     diag = {"gerado_em": NOW.isoformat() + "Z", "diagMode": DIAG,
             "carteiraTotal": carteira_total, "ativos": ativos_total,
             "usoApp": {"sim": n_true, "nao": n_false, "falha": n_fail},
             "faixas": {f: sum(1 for a in alunos if a["faixa"] == f)
                        for f in ("engajado", "morno", "risco", "semdado")},
-            "publicoAlvo": {c: sum(1 for a in alunos if a.get("categoria") == c)
-                            for c in ("Fitness", "Ambos", "Agua", "Lutas e Outros")},
-            "elegiveis": sum(1 for a in alunos if a.get("elegivel") is True),
+            "fazTreino": {"sim": faz, "nao": nfaz, "semVinculo": ativos_total - faz - nfaz},
+            "professoresComCarteira": sum(1 for p in professores if p.get("carteiraReal")),
             "biTotalPorUnidade": {r_["unit"]["nome"]: r_["unit"].get("totalAlunos")
                                   for r_ in resultados.values()},
             "situacao": dict(sorted(sit_total.items(), key=lambda x: -x[1])),
