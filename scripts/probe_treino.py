@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""probe v19 — LIGAR aluno -> plano/modalidade.
-Ja sabemos: catalogo em GET /modalidade e GET /planos; o NOME do plano carrega a
-modalidade. Falta achar de qual campo sai o plano/modalidade DE CADA ALUNO.
-Estrategia: para uma amostra de ATIVOS, busca /v1/cliente/{cid} e VARRE recursivamente
-por campos cujo nome bate plano|modalidad|contrato|produto|servico, imprimindo
-caminho->valor (texto de plano, nao PII) e a categoria de 6 baldes.
-PII-safe: so imprime campos de plano/modalidade (nunca nome/cpf/nascimento)."""
+"""probe v20 — onde esta a MODALIDADE por aluno? (busca por VALOR + estrutura)
+Busca em /v1/cliente e /v1/contrato por QUALQUER string que contenha uma palavra
+de modalidade (NATACAO/KARATE/MUAY/FITNESS/TL/HIDRO...), imprimindo caminho->valor
++ a categoria de 7 baldes. Tambem despeja as CHAVES de topo pra mapear a estrutura.
+PII-safe: so imprime valores que casam modalidade (nome de pessoa nao casa); pula
+chaves cpf/email/telefone/nascimento."""
 import os, sys, json, re, unicodedata, urllib.request, urllib.error, urllib.parse
 BASE = "https://apigw.pactosolucoes.com.br"
 KEYS = [("716NORTE","PACTO_KEY_716NORTE"),("905SUL","PACTO_KEY_905SUL"),
@@ -19,26 +18,24 @@ _AGUA=("NATAC","NATA","HIDRO","BEBE","AQUA")
 _LUTAS=("KARATE","MUAY","JIU","JUDO","HAPKIDO","CAPOEIRA","BOXE","TAEKWON","KUNG","LUTA")
 _FIT=("TRANSITO LIVRE"," TL ","FITNESS","MUSCULA","DANCA","PILATES","AULA COLETIVA","FUNCIONAL",
       "SPINNING","CROSS","ZUMBA","RITMO","GINASTICA","ALONGA","YOGA","TREINA")
+KW = _AGUA + _LUTAS + _FIT
 def _tok(t):
     t=" "+_up(t)+" "
     if any(k in t for k in _AGUA): return "agua"
     if any(k in t for k in _FIT): return "fit"
     if any(k in t for k in _LUTAS): return "lutas"
     return "outros"
-
-def categoria6(desc):
-    """6 baldes pedidos + 'Luta' (so luta) + 'Outros' (nao mapeado)."""
+def categoria7(desc):
     toks=[t for t in re.split(r"[;,+/]", str(desc or "")) if t.strip()]
-    b=set(_tok(t) for t in toks)
-    b.discard("outros")
-    A,F,L = "agua" in b, "fit" in b, "lutas" in b
-    if A and F and L: return "Ambos (Agua+Fitness+Luta)"
-    if A and F:       return "Ambos (Agua+Fitness)"
-    if A and L:       return "Ambos (Agua+Luta)"
-    if F and L:       return "Ambos (Fitness+Luta)"
-    if A:             return "Agua"
-    if F:             return "Fitness"
-    if L:             return "Luta"
+    b=set(_tok(t) for t in toks); b.discard("outros")
+    A,F,L="agua" in b,"fit" in b,"lutas" in b
+    if A and F and L: return "Ambos(A+F+L)"
+    if A and F: return "Ambos(A+F)"
+    if A and L: return "Ambos(A+L)"
+    if F and L: return "Ambos(F+L)"
+    if A: return "Agua"
+    if F: return "Fitness"
+    if L: return "Luta"
     return "Outros"
 
 def get(key, path, timeout=30):
@@ -53,24 +50,27 @@ def content(body):
     try: j=json.loads(body); return j.get("content", j)
     except Exception: return None
 
-RX = re.compile(r"plano|modalidad|contrato|produto|servico", re.I)
-BLOCK = re.compile(r"cpf|nome|nasc|email|telefone|endereco|rg|pessoa", re.I)  # nunca imprimir
-
-def find_fields(obj, path="", out=None, depth=0):
+BLOCK = re.compile(r"cpf|email|telefone|celular|nasc|endereco|\brg\b|cep", re.I)
+def scan_values(obj, path="", out=None, depth=0):
     if out is None: out=[]
-    if depth>7: return out
-    if isinstance(obj, dict):
+    if depth>9: return out
+    if isinstance(obj,str):
+        u=" "+_up(obj)+" "
+        if 3<len(obj)<80 and any(k in u for k in KW):
+            out.append((path, obj[:60]))
+    elif isinstance(obj,dict):
         for k,v in obj.items():
-            p=(path+"."+k) if path else k
-            if isinstance(v,(str,int,float)) and RX.search(k) and not BLOCK.search(k) and str(v).strip():
-                out.append((p, str(v)[:60]))
-            find_fields(v, p, out, depth+1)
-    elif isinstance(obj, list):
-        for v in obj[:6]:
-            find_fields(v, path+"[]", out, depth+1)
+            if BLOCK.search(k): continue
+            scan_values(v,(path+"."+k) if path else k,out,depth+1)
+    elif isinstance(obj,list):
+        for v in obj[:10]:
+            scan_values(v,path+"[]",out,depth+1)
     return out
 
-def sample_ativos(key, alvo=8):
+def keys_of(o):
+    return sorted(o.keys()) if isinstance(o,dict) else ("(lista %d)"%len(o) if isinstance(o,list) else type(o).__name__)
+
+def sample_ativos(key, alvo=6):
     out=[]
     for pg in range(0,40):
         if len(out)>=alvo: break
@@ -78,7 +78,7 @@ def sample_ativos(key, alvo=8):
         if not isinstance(c,list): continue
         for x in c:
             if _up(x.get("situacao"))=="ATIVO":
-                out.append(x);
+                out.append(x)
                 if len(out)>=alvo: break
     return out
 
@@ -88,26 +88,35 @@ def main():
         if os.environ.get(env): label,key=lb,os.environ[env]; break
     if not key: print("sem chave",file=sys.stderr); sys.exit(1)
     print("== UNIDADE %s ==" % label, file=sys.stderr)
-    alvos=sample_ativos(key,8)
-    print("amostra ATIVO: %d" % len(alvos), file=sys.stderr)
-    campos_freq={}   # quais paths carregam texto de plano
+
+    # A) /v1/contrato (catalogo/lista) — estrutura + valores de modalidade
+    st,body=get(key,"/v1/contrato?page=0&size=5")
+    c=content(body)
+    print("\n[/v1/contrato] status=%s" % st, file=sys.stderr)
+    itens=c if isinstance(c,list) else (c.get("content") if isinstance(c,dict) else None)
+    if isinstance(itens,list) and itens:
+        print("  item[0] chaves: %s" % keys_of(itens[0]), file=sys.stderr)
+        hits=scan_values(itens[0])
+        for p,v in hits[:10]: print("   modalidade? %-30s = '%s' -> %s" % (p[:30],v,categoria7(v)), file=sys.stderr)
+    else:
+        print("  (sem lista de contratos)", file=sys.stderr)
+
+    # B) /v1/cliente por aluno — estrutura + busca por valor de modalidade
+    alvos=sample_ativos(key,6)
+    print("\n[/v1/cliente] amostra ATIVO: %d" % len(alvos), file=sys.stderr)
     for it in alvos:
         cid=it.get("codigoCliente") or it.get("matricula")
         cli=content(get(key,"/v1/cliente/%s"%urllib.parse.quote(str(cid)))[1])
-        achados=find_fields(cli)
-        # mostra so paths com valor "texto de plano" (>3 chars, tem letra)
-        vistos=[(p,v) for p,v in achados if isinstance(v,str) and len(v.strip())>3 and re.search(r"[A-Za-z]",v)]
-        for p,v in vistos:
-            campos_freq[p]=campos_freq.get(p,0)+1
-        if vistos:
-            print("  cliente %s:" % cid, file=sys.stderr)
-            for p,v in vistos[:8]:
-                print("     %-38s = '%s'  -> %s" % (p[:38], v, categoria6(v)), file=sys.stderr)
+        if not isinstance(cli,dict):
+            print("  cliente %s: (sem dict)"%cid, file=sys.stderr); continue
+        print("  cliente %s | chaves topo: %s" % (cid, keys_of(cli)), file=sys.stderr)
+        cs=cli.get("clienteSintetico")
+        if isinstance(cs,dict): print("     clienteSintetico chaves: %s" % keys_of(cs), file=sys.stderr)
+        hits=scan_values(cli)
+        if hits:
+            for p,v in hits[:8]: print("     >> %-34s = '%s' -> %s" % (p[:34],v,categoria7(v)), file=sys.stderr)
         else:
-            print("  cliente %s: (nenhum campo plano/modalidade com texto)" % cid, file=sys.stderr)
-    print("\n== PATHS que carregaram texto de plano (freq na amostra) ==", file=sys.stderr)
-    for p,n in sorted(campos_freq.items(), key=lambda x:-x[1]):
-        print("   %-40s %d/%d" % (p, n, len(alvos)), file=sys.stderr)
-    print("\n>> Se algum path aparece consistente, e a fonte da modalidade por aluno.", file=sys.stderr)
+            print("     (nenhum valor com modalidade)", file=sys.stderr)
+    print("\n>> Onde aparecer 'modalidade? ...' ou '>> ...', ali esta o texto do plano por aluno.", file=sys.stderr)
 
 if __name__=="__main__": main()
