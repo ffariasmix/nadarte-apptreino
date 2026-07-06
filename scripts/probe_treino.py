@@ -1,18 +1,41 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""probe v22 — achar o campo de FOTO (aluno e professor) e se vem preenchido.
-Aluno: procura foto em /v1/cliente (JA chamamos por aluno -> de graca) e no
-       /clientes/{matricula}/dados-pessoais (urlFoto).
-Professor: inspeciona /psec/colaboradores/bi-professores-vinculos.
-PII-safe: NAO imprime a URL completa (so scheme://host + extensao + tamanho),
-nem nome/cpf. Foto e' dado pessoal -> so confirmamos que o campo existe/preenche."""
+"""probe v23 — CONTRATO por matricula -> modalidade (7 baldes).
+Endpoint achado na doc: GET /v1/contrato/matricula/{matricula} (escopo
+adm:cadastros:contrato:modelos-de-contrato:consultar). Confirma se NOSSA chave
+tem o escopo (status 200 x 403/500), mostra a ESTRUTURA do item e classifica a
+descricao do plano nos 7 baldes. PII-safe: descricao de plano nao e dado pessoal."""
 import os, sys, json, re, unicodedata, urllib.request, urllib.error, urllib.parse
 BASE = "https://apigw.pactosolucoes.com.br"
 KEYS = [("716NORTE","PACTO_KEY_716NORTE"),("905SUL","PACTO_KEY_905SUL"),
         ("604NORTE","PACTO_KEY_604NORTE"),("LAGONORTE","PACTO_KEY_LAGONORTE"),
         ("LAGOSUL","PACTO_KEY_LAGOSUL"),("NATAL","PACTO_KEY_NATAL")]
 
-def _up(s): return "".join(c for c in unicodedata.normalize("NFD",str(s or "")) if unicodedata.category(c)!="Mn").upper()
+def _up(s): return "".join(c for c in unicodedata.normalize("NFD",str(s or "")) if unicodedata.category(c)!="Mn").upper().strip()
+_AGUA=("NATAC","NATA","HIDRO","BEBE","AQUA")
+_LUTAS=("KARATE","MUAY","JIU","JUDO","HAPKIDO","CAPOEIRA","BOXE","TAEKWON","KUNG","LUTA")
+_FIT=("TRANSITO LIVRE"," TL ","FITNESS","MUSCULA","DANCA","PILATES","AULA COLETIVA","FUNCIONAL",
+      "SPINNING","CROSS","ZUMBA","RITMO","GINASTICA","ALONGA","YOGA","TREINA","LIVRE ACESSO")
+def _tok(t):
+    t=" "+_up(t)+" "
+    if any(k in t for k in _AGUA): return "agua"
+    if any(k in t for k in _FIT): return "fit"
+    if any(k in t for k in _LUTAS): return "lutas"
+    return "outros"
+def categoria7(desc):
+    u=_up(desc)
+    if "TODAS AS MODALIDADES" in u or "TODAS MODALIDADES" in u: return "Ambos(A+F+L)"  # plano completo
+    toks=[t for t in re.split(r"[;,+/]", str(desc or "")) if t.strip()]
+    b=set(_tok(t) for t in toks); b.discard("outros")
+    A,F,L="agua" in b,"fit" in b,"lutas" in b
+    if A and F and L: return "Ambos(A+F+L)"
+    if A and F: return "Ambos(A+F)"
+    if A and L: return "Ambos(A+L)"
+    if F and L: return "Ambos(F+L)"
+    if A: return "Agua"
+    if F: return "Fitness"
+    if L: return "Luta"
+    return "Outros"
 
 def get(key, path, timeout=30):
     h={"Authorization":"Bearer "+key,"Accept":"application/json","empresaId":"1"}
@@ -26,35 +49,7 @@ def content(body):
     try: j=json.loads(body); return j.get("content", j)
     except Exception: return None
 
-FOTO_RX = re.compile(r"foto|imagem|avatar|urlfoto|fotokey|photo|picture|image", re.I)
-
-def safe_url(v):
-    """resumo PII-safe de uma URL/base64: scheme://host + extensao + tamanho."""
-    v=str(v)
-    if v.startswith("data:"): return "data-uri(base64) len=%d" % len(v)
-    try:
-        p=urllib.parse.urlparse(v)
-        ext=""
-        m=re.search(r"\.(jpg|jpeg|png|webp|gif)(\?|$)", v, re.I)
-        if m: ext=" ."+m.group(1).lower()
-        if p.scheme and p.netloc: return "%s://%s%s len=%d" % (p.scheme,p.netloc,ext,len(v))
-    except Exception: pass
-    return "(nao-url) len=%d '%s...'" % (len(v), v[:12])
-
-def find_foto(obj, path="", out=None, depth=0):
-    if out is None: out=[]
-    if depth>8: return out
-    if isinstance(obj,dict):
-        for k,v in obj.items():
-            p=(path+"."+k) if path else k
-            if isinstance(v,str) and FOTO_RX.search(k):
-                out.append((p, bool(v.strip()), safe_url(v) if v.strip() else "(vazio)"))
-            find_foto(v,p,out,depth+1)
-    elif isinstance(obj,list):
-        for v in obj[:5]: find_foto(v,path+"[]",out,depth+1)
-    return out
-
-def sample_ativos(key, alvo=6):
+def sample_ativos(key, alvo=12):
     out=[]
     for pg in range(0,40):
         if len(out)>=alvo: break
@@ -72,52 +67,34 @@ def main():
         if os.environ.get(env): label,key=lb,os.environ[env]; break
     if not key: print("sem chave",file=sys.stderr); sys.exit(1)
     print("== UNIDADE %s ==" % label, file=sys.stderr)
+    alvos=sample_ativos(key,12)
+    print("amostra ATIVO: %d\n" % len(alvos), file=sys.stderr)
 
-    # ---- PROFESSOR: bi-professores-vinculos ----
-    print("\n[PROFESSOR] /psec/colaboradores/bi-professores-vinculos", file=sys.stderr)
-    profs=content(get(key,"/psec/colaboradores/bi-professores-vinculos")[1])
-    if isinstance(profs,list) and profs:
-        print("  chaves item[0]: %s" % sorted(profs[0].keys()), file=sys.stderr)
-        pp=profs[0].get("professor")
-        if isinstance(pp,dict): print("  chaves professor: %s" % sorted(pp.keys()), file=sys.stderr)
-        n_ok=0; ex=[]
-        for it in profs[:20]:
-            hits=find_foto(it)
-            preench=[h for h in hits if h[1]]
-            if preench: n_ok+=1
-            for p,ok,resumo in hits:
-                if (p,resumo) not in [(a,b) for a,b,_ in ex]:
-                    ex.append((p,resumo,ok))
-        print("  campos de foto encontrados:", file=sys.stderr)
-        seen=set()
-        for p,resumo,ok in ex:
-            if p in seen: continue
-            seen.add(p)
-            print("     %-26s preenchido=%s  %s" % (p, ok, resumo), file=sys.stderr)
-        print("  professores (dos 20) com foto preenchida: %d" % n_ok, file=sys.stderr)
-    else:
-        print("  (sem lista de professores)", file=sys.stderr)
-
-    # ---- ALUNO: /v1/cliente (de graca) + dados-pessoais.urlFoto ----
-    alvos=sample_ativos(key,6)
-    print("\n[ALUNO] amostra ATIVO: %d" % len(alvos), file=sys.stderr)
-    cli_ok=dp_ok=0; campos_cli={}
+    status_cont={}; dist={}; estrutura_mostrada=False; sem_contrato=0
     for it in alvos:
-        cid=it.get("codigoCliente") or it.get("matricula")
-        mat=it.get("matricula") or cid
-        cli=content(get(key,"/v1/cliente/%s"%urllib.parse.quote(str(cid)))[1])
-        for p,ok,resumo in (find_foto(cli) if isinstance(cli,dict) else []):
-            campos_cli[p]=campos_cli.get(p,[0,""]);
-            if ok: campos_cli[p][0]+=1; campos_cli[p][1]=resumo
-            if ok: cli_ok+=1
-        dp=content(get(key,"/clientes/%s/dados-pessoais"%urllib.parse.quote(str(mat)))[1])
-        uf = dp.get("urlFoto") if isinstance(dp,dict) else None
-        if str(uf or "").strip(): dp_ok+=1
-    print("  /v1/cliente -> campos de foto vistos:", file=sys.stderr)
-    for p,(n,resumo) in sorted(campos_cli.items(), key=lambda x:-x[1][0]):
-        print("     %-28s preenchido em %d/%d  %s" % (p, n, len(alvos), resumo), file=sys.stderr)
-    if not campos_cli: print("     (nenhum campo de foto no /v1/cliente)", file=sys.stderr)
-    print("  /clientes/{matricula}/dados-pessoais.urlFoto preenchido: %d/%d" % (dp_ok,len(alvos)), file=sys.stderr)
-    print("\n>> Onde 'preenchido' > 0, ali esta a foto pronta pra exibir.", file=sys.stderr)
+        mat=it.get("matricula") or it.get("codigoCliente")
+        st,body=get(key,"/v1/contrato/matricula/%s"%urllib.parse.quote(str(mat)))
+        status_cont[st]=status_cont.get(st,0)+1
+        c=content(body) if (isinstance(st,int) and 200<=st<300) else None
+        itens=c if isinstance(c,list) else (c.get("content") if isinstance(c,dict) else None)
+        if not isinstance(itens,list) or not itens:
+            if st!=200: print("  matricula=%s -> HTTP %s" % (mat,st), file=sys.stderr)
+            else: sem_contrato+=1
+            continue
+        if not estrutura_mostrada:
+            print("  [estrutura] chaves do contrato: %s" % sorted(itens[0].keys()), file=sys.stderr)
+            print("  [estrutura] item[0]: %s\n" % json.dumps(itens[0], ensure_ascii=False)[:300], file=sys.stderr)
+            estrutura_mostrada=True
+        # classifica a descricao de cada contrato do aluno (normalmente pega o vigente)
+        descs=[str(x.get("descricao") or "") for x in itens if str(x.get("descricao") or "").strip()]
+        cat=categoria7(" , ".join(descs)) if descs else "Outros"
+        dist[cat]=dist.get(cat,0)+1
+        print("  matricula=%s | %d contrato(s): %s -> %s" % (mat, len(itens), descs[:2], cat), file=sys.stderr)
+
+    print("\n== RESUMO ==", file=sys.stderr)
+    print("  status HTTP do endpoint contrato: %s" % status_cont, file=sys.stderr)
+    print("  sem contrato (200 vazio): %d" % sem_contrato, file=sys.stderr)
+    print("  distribuicao 7 baldes (amostra): %s" % dist, file=sys.stderr)
+    print("\n>> status 200 => nossa chave TEM o escopo; ai eu ligo a modalidade no coletor.", file=sys.stderr)
 
 if __name__=="__main__": main()
