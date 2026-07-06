@@ -1,0 +1,10 @@
+# artefatos gerados no runner / localmente (NUNCA versionar)
+data/
+public/
+__pycache__/
+*.pyc
+*.bin
+sa_key.json
+.DS_Store
+
+# obs: history/ (serie.json, diag.json) É versionado de propósito — agregado, sem PII
