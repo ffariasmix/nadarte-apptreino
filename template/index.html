@@ -136,7 +136,7 @@ window.DATA = /*__DATA__*/null;
   const N = v => Number(v)||0;
   if(D.gerado_em){ try{ document.getElementById('asof').textContent = new Date(D.gerado_em).toLocaleString('pt-BR'); }catch(e){} }
 
-  let state = {unit:'all', tab:'geral', crmFaixa:'all', crmPub:'all', crmQ:'', crmPage:1, scoreIni:'all', scorePage:1};
+  let state = {unit:'all', tab:'geral', crmFaixa:'all', crmPub:'all', crmMod:'all', crmQ:'', crmPage:1, scoreIni:'all', scorePage:1};
   const sel = () => state.unit==='all' ? ALL : ALL.filter(u=>u.id===state.unit);
   const sum = k => sel().reduce((a,u)=>a+N(u[k]),0);
   const wavg = (k,w) => { let n=0,d=0; sel().forEach(u=>{const ww=N(u[w]); if(u[k]!=null){n+=Number(u[k])*ww; d+=ww;}}); return d?n/d:null; };
@@ -206,6 +206,7 @@ window.DATA = /*__DATA__*/null;
     let h='<div class="sec">'+(state.unit==='all'?'Panorama da rede':'Unidade: '+uName(state.unit))+'</div><div class="kgrid">';
     h+=K.map(c=>`<div class="kpi"><div class="n"><span class="dot" style="background:${c.dot}"></span>${c.n}</div><div class="v">${c.v}</div><div class="s">${c.s}</div></div>`).join('')+'</div>';
     h+=indiceHero();
+    if(D.alunos && D.alunos.length){ h+='<div class="sec">Modalidade</div>'+modPanel(crmBase()); }
     h+='<div class="sec">Gráficos</div><div class="grid2">';
     h+='<div class="panel"><h3>Uso do app por unidade</h3><p class="sub">% de alunos que usam o App Treino</p>'
        +hbars(ALL.map(u=>({label:u.nome,value:N(u.percUtilizamApp)})),'#8B5CF6',v=>pct(v))+'</div>';
@@ -314,7 +315,7 @@ window.DATA = /*__DATA__*/null;
       +'</div>';
     h+='<div class="sec">Ranking de atuação <span style="font-weight:600;color:#8A8A8A;font-size:12px">— clique num professor para ver os alunos da carteira</span></div><div class="tbl"><div class="scroll"><table><thead><tr>'
       +'<th>#</th><th>Professor</th><th>Unidade</th><th>Carteira</th><th>Alunos c/ treino</th><th>Em dia</th><th>Vencidos</th><th>% em dia</th><th>Índice</th></tr></thead><tbody>';
-    h+=P.map((p,i)=>`<tr class="click" data-pid="${esc(p.id)}"><td style="font-size:15px">${medal(i)}</td><td><b>${esc(p.nome)||('Prof '+(p.id||''))}</b></td><td>${uName(p.unit)}</td>
+    h+=P.map((p,i)=>`<tr class="click" data-pid="${esc(p.id)}"><td style="font-size:15px">${medal(i)}</td><td><div class="aluno-cell">${avatar(p)}<div class="nm">${esc(p.nome)||('Prof '+(p.id||''))}</div></div></td><td>${uName(p.unit)}</td>
       <td><b>${fmt(p.carteiraReal||0)}</b></td><td>${fmt(p.comTreino)}</td><td>${fmt(p.emDia)}</td>
       <td><span class="pill ${N(p.vencidos)>0?'c-red':'c-green'}">${fmt(p.vencidos)}</span></td>
       <td>${pct(p.pctEmDia)}</td>
@@ -330,7 +331,7 @@ window.DATA = /*__DATA__*/null;
     const alunos=(D.alunos||[]).filter(a=>String(a.professorId)===String(pid))
       .sort((a,b)=>(ord[a.faixa]??9)-(ord[b.faixa]??9));
     let h=`<button class="pmx" onclick="document.getElementById('pmodal').classList.remove('on')">&times;</button>`;
-    h+=`<h3 style="margin:0 0 2px;font-size:16px">${esc(prof.nome)||'Professor'}</h3><p class="sub" style="margin:0 0 14px">${uName(prof.unit)} · ${fmt(alunos.length)} alunos na carteira</p>`;
+    h+=`<div style="display:flex;align-items:center;gap:12px;margin:0 0 14px"><span class="av" style="width:44px;height:44px;font-size:15px">${avatar(prof).replace('<span class="av">','').replace(/<\/span>$/,'')}</span><div><h3 style="margin:0 0 2px;font-size:16px">${esc(prof.nome)||'Professor'}</h3><p class="sub" style="margin:0">${uName(prof.unit)} · ${fmt(alunos.length)} alunos na carteira</p></div></div>`;
     if(!alunos.length){ h+='<div class="empty" style="border:none;padding:24px">Sem alunos vinculados nesta coleta.</div>'; }
     else { h+='<div class="tbl"><div class="scroll" style="max-height:56vh"><table><thead><tr><th>Aluno</th><th>Usa app</th><th>Contrato</th><th>Faixa</th></tr></thead><tbody>'
       +alunos.map(a=>{const f=FA[a.faixa]||['—','']; return `<tr><td><div class="aluno-cell"><span class="av">${iniciais(a.nome)}</span><div><div class="nm">${esc(a.nome)}</div><div class="ct">${esc(a.email||'')}</div></div></div></td><td>${appPill(a.usaApp)}</td><td>${contratoPill(a.diasContrato)}</td><td><span class="pill ${f[1]}">${f[0]}</span></td></tr>`;}).join('')
@@ -347,12 +348,29 @@ window.DATA = /*__DATA__*/null;
   function fazPill(v){ return v===true?'<span class="pill c-green">Sim</span>':v===false?'<span class="pill c-gray">Não</span>':'<span class="pill" style="background:#EEE;color:#999">—</span>'; }
   function contratoPill(d){ if(d==null) return '<span class="pill c-green">ativo</span>'; if(d<0) return '<span class="pill c-red">vencido</span>'; if(d<=30) return `<span class="pill c-amber">vence em ${d}d</span>`; if(d<=90) return `<span class="pill" style="background:#EEF1F6;color:#5a6b86">${d}d</span>`; return `<span class="pill c-green">${d}d</span>`; }
   function avatar(a){ const ini=iniciais(a.nome); return a.foto?`<span class="av">${ini}<img class="avimg" src="${esc(a.foto)}" onerror="this.remove()" alt=""></span>`:`<span class="av">${ini}</span>`; }
+  // ---------- Modalidade (7 baldes, via contrato) ----------
+  const MOD_ORDER=['Fitness','Agua','Luta','Ambos (Agua+Fitness)','Ambos (Agua+Luta)','Ambos (Fitness+Luta)','Ambos (Agua+Fitness+Luta)','Outros'];
+  const MOD_LABEL={'Fitness':'Fitness','Agua':'Água','Luta':'Luta','Ambos (Agua+Fitness)':'Ambos · Água+Fitness','Ambos (Agua+Luta)':'Ambos · Água+Luta','Ambos (Fitness+Luta)':'Ambos · Fitness+Luta','Ambos (Agua+Fitness+Luta)':'Ambos · Água+Fitness+Luta','Outros':'Outros'};
+  const MOD_COLOR={'Fitness':'#E8521A','Agua':'#3E7CB1','Luta':'#8B5CF6','Ambos (Agua+Fitness)':'#5BAD6F','Ambos (Agua+Luta)':'#0EA5A0','Ambos (Fitness+Luta)':'#F0A500','Ambos (Agua+Fitness+Luta)':'#2D8F5A','Outros':'#8A8A8A'};
+  const modKey = a => MOD_ORDER.includes(a&&a.modalidade)?a.modalidade:'Outros';
+  function modPill(m){ const k=MOD_ORDER.includes(m)?m:'Outros'; const c=MOD_COLOR[k]; return `<span class="pill" style="background:${c}22;color:${c}">${MOD_LABEL[k]}</span>`; }
+  function modDist(list){ const d={}; MOD_ORDER.forEach(k=>d[k]=0); list.forEach(a=>{d[modKey(a)]++;}); return d; }
+  function modPanel(list){
+    const d=modDist(list), tot=list.length||1, max=Math.max(1,...MOD_ORDER.map(k=>d[k]));
+    let h='<div class="panel"><h3>Distribuição por modalidade</h3><p class="sub">via contrato/plano do aluno — '+(state.unit==='all'?'rede':uName(state.unit))+'</p>';
+    h+=MOD_ORDER.filter(k=>d[k]>0).map(k=>`<div style="display:flex;align-items:center;gap:12px;margin:9px 0">
+      <div style="min-width:186px;font-size:12.5px;font-weight:600">${MOD_LABEL[k]}</div>
+      <div class="bar" style="max-width:320px"><i style="width:${d[k]/max*100}%;background:${MOD_COLOR[k]}"></i></div>
+      <div style="font-weight:800;font-size:14px;min-width:96px;text-align:right">${fmt(d[k])} <span style="color:#8A8A8A;font-weight:600;font-size:11.5px">(${pct(d[k]/tot*100)})</span></div></div>`).join('');
+    h+='</div>'; return h;
+  }
 
   const crmBase = () => (D.alunos||[]).filter(a=> state.unit==='all' || a.unit===state.unit);
   function crmFiltered(){
     let A=crmBase();
     if(state.crmFaixa!=='all') A=A.filter(a=>a.faixa===state.crmFaixa);
     if(state.crmPub!=='all')   A=A.filter(a=> state.crmPub==='sim' ? a.fazTreino===true : a.fazTreino===false);
+    if(state.crmMod!=='all')   A=A.filter(a=> modKey(a)===state.crmMod);
     const qq=(state.crmQ||'').trim().toLowerCase();
     if(qq) A=A.filter(a=>String(a.nome||'').toLowerCase().includes(qq));
     A.sort((a,b)=>{const o={risco:0,morno:1,engajado:2}; if(o[a.faixa]!==o[b.faixa]) return o[a.faixa]-o[b.faixa]; return (a.diasContrato??1e9)-(b.diasContrato??1e9);});
@@ -366,12 +384,12 @@ window.DATA = /*__DATA__*/null;
     const start=(state.crmPage-1)*PER, rows=A.slice(start,start+PER);
     const showUnit = state.unit==='all';
     let h='<div class="tbl"><div class="scroll"><table><thead><tr><th>Aluno</th>'
-      +(showUnit?'<th>Unidade</th>':'')+'<th>Professor</th><th>Faz treino</th><th>Usa o app</th><th>Contrato</th><th>Faixa</th><th>Score</th></tr></thead><tbody>';
-    if(!rows.length){ h+=`<tr><td colspan="${showUnit?8:7}"><div class="empty" style="border:none;padding:26px">Nenhum aluno nesta combinação de filtros.</div></td></tr>`; }
+      +(showUnit?'<th>Unidade</th>':'')+'<th>Professor</th><th>Modalidade</th><th>Faz treino</th><th>Usa o app</th><th>Contrato</th><th>Faixa</th><th>Score</th></tr></thead><tbody>';
+    if(!rows.length){ h+=`<tr><td colspan="${showUnit?9:8}"><div class="empty" style="border:none;padding:26px">Nenhum aluno nesta combinação de filtros.</div></td></tr>`; }
     rows.forEach(a=>{ const f=FA[a.faixa]||['—','']; h+=`<tr>
       <td><div class="aluno-cell">${avatar(a)}<div><div class="nm">${esc(a.nome)||'—'}</div><div class="ct">${esc(a.email||'')}${a.telefone?(a.email?' · ':'')+esc(a.telefone):''}</div></div></div></td>`
       +(showUnit?`<td>${esc(a.unitNome)}</td>`:'')
-      +`<td class="muted">${esc(a.professor)||'—'}</td><td>${fazPill(a.fazTreino)}</td><td>${appPill(a.usaApp)}</td><td>${contratoPill(a.diasContrato)}</td>
+      +`<td class="muted">${esc(a.professor)||'—'}</td><td>${modPill(a.modalidade)}</td><td>${fazPill(a.fazTreino)}</td><td>${appPill(a.usaApp)}</td><td>${contratoPill(a.diasContrato)}</td>
       <td><span class="pill ${f[1]}">${f[0]}</span></td><td>${scorePill(scoreAluno(a))}</td></tr>`; });
     h+='</tbody></table></div>';
     h+=`<div class="pager"><span style="color:#8A8A8A;font-size:12.5px">${fmt(A.length)} aluno(s) · página ${state.crmPage} de ${pages}</span>
@@ -400,6 +418,11 @@ window.DATA = /*__DATA__*/null;
       +`<div class="stack"><i style="width:${ne/tot*100}%;background:#5BAD6F"></i><i style="width:${nm/tot*100}%;background:#F0A500"></i><i style="width:${nr/tot*100}%;background:#D64545"></i></div>`
       +`<div style="display:flex;gap:16px;margin-top:8px;font-size:12px;color:#6a6a6a;flex-wrap:wrap">
         <span><b style="color:#3f8a52">■</b> Engajado ${fmt(ne)}</span><span><b style="color:#a97c00">■</b> Morno ${fmt(nm)}</span><span><b style="color:#b53434">■</b> Em risco ${fmt(nr)}</span></div></div>`;
+    // distribuição por modalidade (7 baldes)
+    h+='<div style="margin-top:14px">'+modPanel(B)+'</div>';
+    // filtro modalidade
+    const modChips=[['all','Todas']].concat(MOD_ORDER.filter(k=>B.some(a=>modKey(a)===k)).map(k=>[k,MOD_LABEL[k]]));
+    h+='<div class="subf"><span class="flab">Modalidade</span>'+modChips.map(m=>`<button class="chip cm ${state.crmMod===m[0]?'on':''}" data-m="${esc(m[0])}">${m[1]}</button>`).join('')+'</div>';
     // filtro faixa
     const faixas=[['all','Todos'],['engajado','Engajado'],['morno','Morno'],['risco','Em risco']];
     h+='<div class="subf"><span class="flab">Faixa</span>'+faixas.map(f=>`<button class="chip cf ${state.crmFaixa===f[0]?'on':''}" data-f="${f[0]}">${f[1]}</button>`).join('')+'</div>';
@@ -410,10 +433,11 @@ window.DATA = /*__DATA__*/null;
     // busca
     h+='<div class="subf"><span class="flab">Buscar</span><input class="srch" id="crmSearch" type="text" placeholder="nome do aluno…" value="'+esc(state.crmQ||'')+'"></div>';
     h+='<div id="crmResults" style="margin-top:12px"></div>';
-    h+='<div class="note"><b>Como lemos a faixa (dados reais disponíveis):</b> <b>Engajado</b> = usa o App Treino e contrato vigente; <b>Morno</b> = usa o app mas contrato a vencer, ou não usa mas contrato ok; <b>Em risco</b> = não usa o app e contrato vencendo/vencido. Base: <b>alunos ativos</b> (situação = ATIVO) via <code>/clientes/simples</code> + uso do app via <code>/psec/alunos/alunoApp</code>. <b>Faz treino</b> = aluno vinculado a um <b>professor de treino</b> (via <code>/v1/cliente.vinculos</code> cruzado com <code>bi-professores-vinculos</code>) — é o corte de elegibilidade ao App Treino (substitui o "público-alvo", que não vem da API). A modalidade exata (Fitness/Água) e o "treino em dia" por aluno dependem de fontes/endpoints ainda indisponíveis.</div>';
+    h+='<div class="note"><b>Como lemos a faixa (dados reais disponíveis):</b> <b>Engajado</b> = usa o App Treino e contrato vigente; <b>Morno</b> = usa o app mas contrato a vencer, ou não usa mas contrato ok; <b>Em risco</b> = não usa o app e contrato vencendo/vencido. Base: <b>alunos ativos</b> (situação = ATIVO) via <code>/clientes/simples</code> + uso do app via <code>/psec/alunos/alunoApp</code>. <b>Faz treino</b> = aluno vinculado a um <b>professor de treino</b> (via <code>/v1/cliente.vinculos</code> cruzado com <code>bi-professores-vinculos</code>) — é o corte de elegibilidade ao App Treino. <b>Modalidade</b> (Fitness/Água/Luta/Ambos, 7 baldes) vem da descrição do plano em <code>/v1/contrato/matricula/{matricula}</code>. O "treino em dia" por aluno ainda depende de endpoint indisponível.</div>';
     el.innerHTML=h;
     el.querySelectorAll('.chip.cf').forEach(b=>b.onclick=()=>{ state.crmFaixa=b.dataset.f; state.crmPage=1; renderCRM(); });
     el.querySelectorAll('.chip.cp').forEach(b=>b.onclick=()=>{ state.crmPub=b.dataset.p; state.crmPage=1; renderCRM(); });
+    el.querySelectorAll('.chip.cm').forEach(b=>b.onclick=()=>{ state.crmMod=b.dataset.m; state.crmPage=1; renderCRM(); });
     const sb=document.getElementById('crmSearch');
     if(sb){ sb.oninput=()=>{ state.crmQ=sb.value; state.crmPage=1; renderCRMResults(); }; }
     renderCRMResults();

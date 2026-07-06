@@ -11,7 +11,7 @@ Parte 3 (CRM 360 por ALUNO): /clientes/simples (carteira paginada) + /psec/aluno
 Saida: data/treino.json = {gerado_em, unidades[], professores[], alunos[], categorias{}}
 Datas em epoch ms. Auth Bearer por unidade, header empresaId:1. Respostas {content:...}.
 """
-import os, sys, json, time, random, datetime, unicodedata
+import os, sys, json, time, random, datetime, unicodedata, re
 import urllib.request, urllib.error, urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 
@@ -126,7 +126,7 @@ def ativo(it):
 # Fonte do texto: campo `descricao` do plano (em /clientes/{matricula}/dados-pessoais).
 _AGUA  = ("NATAC","NATA","HIDRO","BEBE","AQUA")
 _LUTAS = ("KARATE","MUAY","JIU","JUDO","HAPKIDO","CAPOEIRA","BOXE","TAEKWON","KUNG","LUTA")
-_FIT   = ("TRANSITO LIVRE","FITNESS","MUSCULA","DANCA","PILATES","AULA COLETIVA","FUNCIONAL",
+_FIT   = ("TRANSITO LIVRE"," TL ","LIVRE ACESSO","FITNESS","MUSCULA","DANCA","PILATES","AULA COLETIVA","FUNCIONAL",
           "SPINNING","CROSS","ZUMBA","RITMO","GINASTICA","ALONGA","YOGA","TREINA")
 
 def _up(s):
@@ -154,6 +154,52 @@ def classify_grupo(descricao):
     return "Lutas e Outros"                               # so lutas e/ou outros
 
 ELEGIVEIS = ("Fitness", "Ambos")   # quem usa o App Treino
+
+# --- Modalidade em 7 baldes (a partir da descricao do contrato/plano) ---
+# Fonte: GET /v1/contrato/matricula/{matricula} -> content[].descricao
+def _tok7(tok):
+    t = " " + _up(tok) + " "                 # padding p/ casar " TL "
+    if any(k in t for k in _AGUA):  return "agua"
+    if any(k in t for k in _FIT):   return "fit"
+    if any(k in t for k in _LUTAS): return "lutas"
+    return "outros"
+
+def categoria7(desc):
+    """Fitness / Agua / Luta / Ambos(A+F) / Ambos(A+L) / Ambos(F+L) / Ambos(A+F+L) / Outros."""
+    u = _up(desc)
+    if "TODAS AS MODALIDADES" in u or "TODAS MODALIDADES" in u:
+        return "Ambos (Agua+Fitness+Luta)"    # plano completo
+    toks = [t for t in re.split(r"[;,+/]", str(desc or "")) if t.strip()]
+    b = set(_tok7(t) for t in toks); b.discard("outros")
+    A, F, L = "agua" in b, "fit" in b, "lutas" in b
+    if A and F and L: return "Ambos (Agua+Fitness+Luta)"
+    if A and F:       return "Ambos (Agua+Fitness)"
+    if A and L:       return "Ambos (Agua+Luta)"
+    if F and L:       return "Ambos (Fitness+Luta)"
+    if A:             return "Agua"
+    if F:             return "Fitness"
+    if L:             return "Luta"
+    return "Outros"
+
+def contrato_modalidade(key, matricula):
+    """GET /v1/contrato/matricula/{matricula} -> (categoria7, descricaoPrincipal).
+    (None,None) se a chamada falhar; ('Outros',None) se vier sem contrato/descricao."""
+    if matricula is None:
+        return (None, None)
+    st, body = http_get(key, "/v1/contrato/matricula/%s" % matricula, tries=2, timeout=20)
+    if st != 200:
+        return (None, None)
+    try:
+        j = json.loads(body); c = j.get("content", j)
+        itens = c if isinstance(c, list) else (c.get("content") if isinstance(c, dict) else None)
+        if not isinstance(itens, list) or not itens:
+            return ("Outros", None)
+        descs = [str(x.get("descricao") or "") for x in itens if str(x.get("descricao") or "").strip()]
+        if not descs:
+            return ("Outros", None)
+        return (categoria7(" , ".join(descs)), descs[0])
+    except Exception:
+        return (None, None)
 
 def classifica(usa_app, fim_ms):
     """1a) uso do app + contrato. dias = quanto falta para o fim do contrato."""
@@ -247,20 +293,24 @@ def prof_treino(key, cid, treino_codes):
     (fazTreino=None se a chamada falhar)."""
     st, body = http_get(key, "/v1/cliente/%s" % cid, tries=3, timeout=20)
     if st != 200:
-        return (None, None, None)
+        return (None, None, None, None)
     try:
         j = json.loads(body); c = j.get("content", j)
+        foto = None
+        pes = c.get("pessoa") if isinstance(c, dict) else None
+        if isinstance(pes, dict):
+            foto = pes.get("fotoUrl") or pes.get("urlFoto")
         vinc = c.get("vinculos") if isinstance(c, dict) else None
         if not isinstance(vinc, list):
-            return (None, None, None)
+            return (None, None, None, foto)
         for v in vinc:
             col = v.get("colaborador") or {}
             cod = str(col.get("codigo"))
             if cod in treino_codes:
-                return (True, col.get("nome"), cod)   # 1o professor de treino vinculado
-        return (False, None, None)                    # tem vinculos, mas nenhum professor de treino
+                return (True, col.get("nome"), cod, foto)   # 1o professor de treino vinculado
+        return (False, None, None, foto)                    # tem vinculos, mas nenhum professor de treino
     except Exception:
-        return (None, None, None)
+        return (None, None, None, None)
 
 # ---------------------------------------------------------------- por unidade
 def coleta_unidade(uk, ulabel, key):
@@ -290,7 +340,7 @@ def coleta_unidade(uk, ulabel, key):
             tp = bi.get("tempoPermanenciaPrograma") or {}
             profs.append({
                 "unit": uk, "unitNome": ulabel,
-                "id": pr.get("id"), "nome": pr.get("nome"),
+                "id": pr.get("id"), "nome": pr.get("nome"), "foto": pr.get("imageUri"),
                 "comTreino": num(bi, "alunosAtivosComTreino"),
                 "semTreino": num(bi, "alunosAtivosSemTreino"),
                 "emDia": num(bi, "alunosAtivosProgramaEmDia"),
@@ -373,32 +423,34 @@ def main():
 
     # ---- FASE 2: uso do app + categoria numa FILA GLOBAL (concorrencia limitada) ----
     tcodes = {uk: resultados[uk].get("treino_codes", set()) for uk in resultados}
-    tarefas = []  # (uk, key, cid)
+    tarefas = []  # (uk, key, cid, mat)
     for uk in sorted(resultados):
         key = keys.get(uk)
         for it in resultados[uk].get("ativos", []):
             cid = it.get("codigoCliente") or it.get("matricula")
-            tarefas.append((uk, key, cid))
-    app_res = {}  # (uk, cid) -> (usaApp, fazTreino, profNome, profId)
+            mat = it.get("matricula") or cid
+            tarefas.append((uk, key, cid, mat))
+    app_res = {}  # (uk, cid) -> (usaApp, fazTreino, profNome, profId, foto, modalidade)
     n_true = n_false = n_fail = n_treino = 0
     if tarefas and not DIAG:
         def _one(t):
-            uk, key, cid = t
+            uk, key, cid, mat = t
             ua = usa_app(key, cid)                              # 1) usa o app?
-            faz, pnome, pcod = prof_treino(key, cid, tcodes.get(uk, set()))  # 2) faz treino? qual professor?
-            return (uk, cid, ua, faz, pnome, pcod)
-        with ThreadPoolExecutor(max_workers=6) as ex:          # <= gentil com a API (2 chamadas/aluno)
-            for uk, cid, ua, faz, pnome, pcod in ex.map(_one, tarefas):
-                app_res[(uk, cid)] = (ua, faz, pnome, pcod)
+            faz, pnome, pcod, foto = prof_treino(key, cid, tcodes.get(uk, set()))  # 2) faz treino? prof? foto?
+            modal, _desc = contrato_modalidade(key, mat)       # 3) modalidade (via contrato)
+            return (uk, cid, ua, faz, pnome, pcod, foto, modal)
+        with ThreadPoolExecutor(max_workers=6) as ex:          # <= gentil com a API (3 chamadas/aluno)
+            for uk, cid, ua, faz, pnome, pcod, foto, modal in ex.map(_one, tarefas):
+                app_res[(uk, cid)] = (ua, faz, pnome, pcod, foto, modal)
         # 2a tentativa (sequencial e leve) so para os que falharam no uso do app
-        faltas = [(uk, key, cid) for (uk, key, cid) in tarefas if app_res.get((uk, cid), (None, None, None, None))[0] is None]
+        faltas = [(uk, key, cid, mat) for (uk, key, cid, mat) in tarefas if app_res.get((uk, cid), (None,)*6)[0] is None]
         if faltas:
             print("  [app] re-tentando %d chamadas que falharam..." % len(faltas), file=sys.stderr)
-            for uk, key, cid in faltas:
+            for uk, key, cid, mat in faltas:
                 time.sleep(0.12)
-                prev = app_res.get((uk, cid), (None, None, None, None))
-                app_res[(uk, cid)] = (usa_app(key, cid), prev[1], prev[2], prev[3])
-        for ua, faz, _pn, _pc in app_res.values():
+                prev = app_res.get((uk, cid), (None,)*6)
+                app_res[(uk, cid)] = (usa_app(key, cid), prev[1], prev[2], prev[3], prev[4], prev[5])
+        for ua, faz, _pn, _pc, _f, _m in app_res.values():
             n_true  += 1 if ua is True else 0
             n_false += 1 if ua is False else 0
             n_fail  += 1 if ua is None else 0
@@ -413,12 +465,13 @@ def main():
         for it in r.get("ativos", []):
             cid = it.get("codigoCliente") or it.get("matricula")
             fim_ms = parse_date_ms(it.get("fimContrato"))
-            ua, faz, pnome, pcod = app_res.get((uk, cid), (None, None, None, None))
+            ua, faz, pnome, pcod, foto, modal = app_res.get((uk, cid), (None, None, None, None, None, None))
             faixa = classifica(bool(ua), fim_ms) if ua is not None else "semdado"
             u_alunos.append({
                 "unit": uk, "unitNome": r["ulabel"],
                 "nome": it.get("nome"), "matricula": it.get("matricula"),
-                "foto": it.get("urlFoto"),
+                "foto": foto,   # pessoa.fotoUrl (via /v1/cliente)
+                "modalidade": modal,   # 7 baldes (via /v1/contrato/matricula)
                 "fazTreino": faz, "professor": pnome, "professorId": pcod,
                 "elegivel": faz,   # elegivel ao App Treino = faz treino (vinculo com prof. de treino)
                 "situacao": it.get("situacao"), "situacaoContrato": it.get("situacaoContrato"),
