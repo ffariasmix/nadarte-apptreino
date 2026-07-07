@@ -1,41 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""probe v23 — CONTRATO por matricula -> modalidade (7 baldes).
-Endpoint achado na doc: GET /v1/contrato/matricula/{matricula} (escopo
-adm:cadastros:contrato:modelos-de-contrato:consultar). Confirma se NOSSA chave
-tem o escopo (status 200 x 403/500), mostra a ESTRUTURA do item e classifica a
-descricao do plano nos 7 baldes. PII-safe: descricao de plano nao e dado pessoal."""
-import os, sys, json, re, unicodedata, urllib.request, urllib.error, urllib.parse
+"""probe v24 — NOTA do treino (estrelas) + EXECUCOES por periodo.
+Endpoints (grupo BI Treino):
+  GET /psec/treino-bi/avaliacao-treino/{tipoBusca}/{codigoPessoa}
+      tipoBusca: 0=Todas, 1..5 = nº de estrelas ; le quantidadeTotalElementos p/ montar o histograma
+  GET /psec/treino-bi/resumo-execucoes-periodo/{empresaId}
+Confirma escopo (200 x 403), descobre o codigoPessoa certo (0=rede?) e a estrutura real.
+PII-safe: imprime SO status, contagens, chaves de campo e a nota media derivada.
+NUNCA imprime nomes nem o texto de comentarios (se existir campo comentario, so cita o nome dele)."""
+import os, sys, json, urllib.request, urllib.error, urllib.parse
 BASE = "https://apigw.pactosolucoes.com.br"
 KEYS = [("716NORTE","PACTO_KEY_716NORTE"),("905SUL","PACTO_KEY_905SUL"),
         ("604NORTE","PACTO_KEY_604NORTE"),("LAGONORTE","PACTO_KEY_LAGONORTE"),
         ("LAGOSUL","PACTO_KEY_LAGOSUL"),("NATAL","PACTO_KEY_NATAL")]
-
-def _up(s): return "".join(c for c in unicodedata.normalize("NFD",str(s or "")) if unicodedata.category(c)!="Mn").upper().strip()
-_AGUA=("NATAC","NATA","HIDRO","BEBE","AQUA")
-_LUTAS=("KARATE","MUAY","JIU","JUDO","HAPKIDO","CAPOEIRA","BOXE","TAEKWON","KUNG","LUTA")
-_FIT=("TRANSITO LIVRE"," TL ","FITNESS","MUSCULA","DANCA","PILATES","AULA COLETIVA","FUNCIONAL",
-      "SPINNING","CROSS","ZUMBA","RITMO","GINASTICA","ALONGA","YOGA","TREINA","LIVRE ACESSO")
-def _tok(t):
-    t=" "+_up(t)+" "
-    if any(k in t for k in _AGUA): return "agua"
-    if any(k in t for k in _FIT): return "fit"
-    if any(k in t for k in _LUTAS): return "lutas"
-    return "outros"
-def categoria7(desc):
-    u=_up(desc)
-    if "TODAS AS MODALIDADES" in u or "TODAS MODALIDADES" in u: return "Ambos(A+F+L)"  # plano completo
-    toks=[t for t in re.split(r"[;,+/]", str(desc or "")) if t.strip()]
-    b=set(_tok(t) for t in toks); b.discard("outros")
-    A,F,L="agua" in b,"fit" in b,"lutas" in b
-    if A and F and L: return "Ambos(A+F+L)"
-    if A and F: return "Ambos(A+F)"
-    if A and L: return "Ambos(A+L)"
-    if F and L: return "Ambos(F+L)"
-    if A: return "Agua"
-    if F: return "Fitness"
-    if L: return "Luta"
-    return "Outros"
+PII_KEYS = ("nome","comentario","comment","obs","observacao","cpf","email","telefone","aluno","cliente")
 
 def get(key, path, timeout=30):
     h={"Authorization":"Bearer "+key,"Accept":"application/json","empresaId":"1"}
@@ -45,21 +23,29 @@ def get(key, path, timeout=30):
     except urllib.error.HTTPError as e: return e.code,(e.read().decode("utf-8","replace") if e.fp else "")
     except Exception as ex: return -1,str(ex)[:120]
 
-def content(body):
-    try: j=json.loads(body); return j.get("content", j)
+def asj(body):
+    try: return json.loads(body)
     except Exception: return None
 
-def sample_ativos(key, alvo=12):
+def keys_safe(obj):
+    """chaves de um item + indicacao [PII] nos campos sensiveis (sem valores)."""
+    if isinstance(obj, list) and obj: obj=obj[0]
+    if not isinstance(obj, dict): return type(obj).__name__
     out=[]
-    for pg in range(0,40):
-        if len(out)>=alvo: break
-        c=content(get(key,"/clientes/simples?"+urllib.parse.urlencode({"page":pg,"size":50}))[1])
-        if not isinstance(c,list): continue
-        for x in c:
-            if _up(x.get("situacao"))=="ATIVO":
-                out.append(x)
-                if len(out)>=alvo: break
+    for k in obj.keys():
+        tag="[PII]" if any(p in k.lower() for p in PII_KEYS) else ""
+        out.append(k+tag)
     return out
+
+def dist_estrelas(key, cp):
+    """Le quantidadeTotalElementos por tipoBusca (0..5). Devolve {tipo:(status,total)}."""
+    d={}
+    for tipo in range(0,6):
+        st,body=get(key,"/psec/treino-bi/avaliacao-treino/%d/%s?page=1&size=1"%(tipo, urllib.parse.quote(str(cp))))
+        j=asj(body)
+        qt=j.get("quantidadeTotalElementos") if isinstance(j,dict) else None
+        d[tipo]=(st,qt)
+    return d, j  # j = ultimo json (tipo=5) so p/ debug
 
 def main():
     label=key=None
@@ -67,34 +53,49 @@ def main():
         if os.environ.get(env): label,key=lb,os.environ[env]; break
     if not key: print("sem chave",file=sys.stderr); sys.exit(1)
     print("== UNIDADE %s ==" % label, file=sys.stderr)
-    alvos=sample_ativos(key,12)
-    print("amostra ATIVO: %d\n" % len(alvos), file=sys.stderr)
 
-    status_cont={}; dist={}; estrutura_mostrada=False; sem_contrato=0
-    for it in alvos:
-        mat=it.get("matricula") or it.get("codigoCliente")
-        st,body=get(key,"/v1/contrato/matricula/%s"%urllib.parse.quote(str(mat)))
-        status_cont[st]=status_cont.get(st,0)+1
-        c=content(body) if (isinstance(st,int) and 200<=st<300) else None
-        itens=c if isinstance(c,list) else (c.get("content") if isinstance(c,dict) else None)
-        if not isinstance(itens,list) or not itens:
-            if st!=200: print("  matricula=%s -> HTTP %s" % (mat,st), file=sys.stderr)
-            else: sem_contrato+=1
-            continue
-        if not estrutura_mostrada:
-            print("  [estrutura] chaves do contrato: %s" % sorted(itens[0].keys()), file=sys.stderr)
-            print("  [estrutura] item[0]: %s\n" % json.dumps(itens[0], ensure_ascii=False)[:300], file=sys.stderr)
-            estrutura_mostrada=True
-        # classifica a descricao de cada contrato do aluno (normalmente pega o vigente)
-        descs=[str(x.get("descricao") or "") for x in itens if str(x.get("descricao") or "").strip()]
-        cat=categoria7(" , ".join(descs)) if descs else "Outros"
-        dist[cat]=dist.get(cat,0)+1
-        print("  matricula=%s | %d contrato(s): %s -> %s" % (mat, len(itens), descs[:2], cat), file=sys.stderr)
+    # pega um codigoPessoa de professor (do bi-professores-vinculos)
+    prof_cp=None
+    pj=asj(get(key,"/psec/colaboradores/bi-professores-vinculos")[1])
+    profs = pj if isinstance(pj,list) else (pj.get("content") if isinstance(pj,dict) else None)
+    if isinstance(profs,list) and profs:
+        prof_cp=(profs[0].get("professor") or {}).get("codigoPessoa")
+    print("codigoPessoa de professor (amostra): %s" % prof_cp, file=sys.stderr)
 
-    print("\n== RESUMO ==", file=sys.stderr)
-    print("  status HTTP do endpoint contrato: %s" % status_cont, file=sys.stderr)
-    print("  sem contrato (200 vazio): %d" % sem_contrato, file=sys.stderr)
-    print("  distribuicao 7 baldes (amostra): %s" % dist, file=sys.stderr)
-    print("\n>> status 200 => nossa chave TEM o escopo; ai eu ligo a modalidade no coletor.", file=sys.stderr)
+    # ---- AVALIACAO-TREINO: histograma de estrelas p/ codigoPessoa candidatos ----
+    for cp in [0, prof_cp]:
+        if cp is None: continue
+        print("\n[avaliacao-treino] codigoPessoa=%s" % cp, file=sys.stderr)
+        d,_=dist_estrelas(key, cp)
+        print("  status/qtd por tipoBusca: %s" % {t:d[t] for t in d}, file=sys.stderr)
+        counts={t:(d[t][1] or 0) for t in range(1,6) if d[t][0]==200}
+        tot=sum(counts.values())
+        if tot>0:
+            media=sum(t*counts.get(t,0) for t in range(1,6))/tot
+            print("  DISTRIBUICAO estrelas (1..5): %s" % counts, file=sys.stderr)
+            print("  >>> NOTA MEDIA: %.2f (de %d avaliacoes)" % (media, tot), file=sys.stderr)
+        # estrutura do content (tipo=0=todas), PII-safe
+        st,body=get(key,"/psec/treino-bi/avaliacao-treino/0/%s?page=1&size=2"%urllib.parse.quote(str(cp)))
+        j=asj(body)
+        if isinstance(j,dict) and isinstance(j.get("content"),list) and j["content"]:
+            print("  chaves de uma avaliacao: %s" % keys_safe(j["content"]), file=sys.stderr)
+
+    # ---- RESUMO-EXECUCOES-PERIODO (empresaId=1) ----
+    print("\n[resumo-execucoes-periodo/1]", file=sys.stderr)
+    st,body=get(key,"/psec/treino-bi/resumo-execucoes-periodo/1?page=0&size=3")
+    j=asj(body)
+    print("  status=%s" % st, file=sys.stderr)
+    if isinstance(j,dict):
+        print("  chaves topo: %s" % sorted(j.keys()), file=sys.stderr)
+        print("  totalElements: %s" % j.get("totalElements"), file=sys.stderr)
+        print("  chaves do content: %s" % keys_safe(j.get("content")), file=sys.stderr)
+
+    # ---- GERADOS x EXECUTADOS (aderencia) ----
+    print("\n[gerados-executados]", file=sys.stderr)
+    st,body=get(key,"/psec/treino-bi/gerados-executados")
+    j=asj(body)
+    print("  status=%s | chaves: %s" % (st, keys_safe(j.get("content") if isinstance(j,dict) and "content" in j else j)), file=sys.stderr)
+
+    print("\n>> status 200 => temos escopo; a NOTA MEDIA acima ja e o KPI7.", file=sys.stderr)
 
 if __name__=="__main__": main()
