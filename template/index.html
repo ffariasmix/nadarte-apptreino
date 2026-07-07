@@ -249,9 +249,9 @@ window.DATA = /*__DATA__*/null;
     h+=K.map(c=>`<div class="kpi"><div class="n"><span class="dot" style="background:${c.dot}"></span>${c.n}</div><div class="v">${c.v}</div><div class="s">${c.s}</div></div>`).join('')+'</div>';
     h+=indiceHero();
     if(D.alunos && D.alunos.length){
-      const alvo=crmBase().length, base=crmBaseFull().length;
-      h+='<div class="sec">Modalidade</div>'+modPanel(crmBaseFull())
-        +`<p class="sub" style="margin:8px 2px 0">Público-alvo do App Treino = planos com <b>Fitness</b> (Fitness · Ambos Água+Fitness · Ambos Fitness+Luta · Ambos Água+Fitness+Luta): <b>${fmt(alvo)}</b> de ${fmt(base)} ativos. As métricas de uso do app (faixas, Score, fila) consideram só esse público.</p>`;
+      const alvo=crmBase().length, base=crmBaseFull().length, fora=base-alvo;
+      h+='<div class="sec">Modalidade — público-alvo do App Treino</div>'+modPanel(crmBase())
+        +`<p class="sub" style="margin:8px 2px 0">Considera só o <b>público-alvo</b> = planos com <b>Fitness</b> (Fitness · Ambos Água+Fitness · Ambos Fitness+Luta · Ambos Água+Fitness+Luta): <b>${fmt(alvo)}</b> de ${fmt(base)} ativos. Fora do recorte: <b>${fmt(fora)}</b> (Água/Luta só, Outros) — não entram nas métricas do app.</p>`;
     }
     h+='<div class="sec">Gráficos</div><div class="grid2">';
     h+='<div class="panel"><h3>Uso do app por unidade</h3><p class="sub">% de alunos que usam o App Treino</p>'
