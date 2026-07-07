@@ -11,7 +11,7 @@ Parte 3 (CRM 360 por ALUNO): /clientes/simples (carteira paginada) + /psec/aluno
 Saida: data/treino.json = {gerado_em, unidades[], professores[], alunos[], categorias{}}
 Datas em epoch ms. Auth Bearer por unidade, header empresaId:1. Respostas {content:...}.
 """
-import os, sys, json, time, random, datetime, unicodedata, re
+import os, sys, json, time, random, datetime, unicodedata, re, hashlib
 import urllib.request, urllib.error, urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 
@@ -200,6 +200,31 @@ def contrato_modalidade(key, matricula):
         return (categoria7(" , ".join(descs)), descs[0])
     except Exception:
         return (None, None)
+
+# --- Cache de modalidade (janela TTL dias) — evita re-consultar o contrato todo dia ---
+# A modalidade quase nao muda; so re-consultamos quem esta sem cache ou checado ha +TTL dias.
+# PII-safe: chave = HASH da matricula (nunca o numero cru); valor = {m: balde, d: data-checagem}.
+MODAL_CACHE_PATH = "history/modalidade_cache.json"
+MODAL_TTL = int(os.environ.get("MODAL_TTL_DAYS", "7"))
+def _mhash(mat):
+    return hashlib.sha256(("nadarte:" + str(mat)).encode("utf-8")).hexdigest()[:16]
+def _fresh(dstr):
+    try:
+        return (datetime.date.today() - datetime.date.fromisoformat(str(dstr))).days < MODAL_TTL
+    except Exception:
+        return False
+def load_modal_cache():
+    try:
+        c = json.load(open(MODAL_CACHE_PATH, encoding="utf-8"))
+        return c if isinstance(c, dict) else {}
+    except Exception:
+        return {}
+def save_modal_cache(cache):
+    try:
+        os.makedirs(os.path.dirname(MODAL_CACHE_PATH), exist_ok=True)
+        json.dump(cache, open(MODAL_CACHE_PATH, "w", encoding="utf-8"), ensure_ascii=False)
+    except Exception as ex:
+        print("[cache] falha ao salvar: %s" % ex, file=sys.stderr)
 
 def classifica(usa_app, fim_ms):
     """1a) uso do app + contrato. dias = quanto falta para o fim do contrato."""
@@ -432,16 +457,37 @@ def main():
             tarefas.append((uk, key, cid, mat))
     app_res = {}  # (uk, cid) -> (usaApp, fazTreino, profNome, profId, foto, modalidade)
     n_true = n_false = n_fail = n_treino = 0
+    modal_cache = load_modal_cache()   # cache versionado (matricula hasheada -> {m, d})
+    HOJE = datetime.date.today().isoformat()
+    new_cache = {}                     # cache reconstruido (so matriculas da base atual -> auto-poda)
+    src_cnt = {"cache": 0, "fetch": 0, "stale": 0}
     if tarefas and not DIAG:
         def _one(t):
             uk, key, cid, mat = t
             ua = usa_app(key, cid)                              # 1) usa o app?
             faz, pnome, pcod, foto = prof_treino(key, cid, tcodes.get(uk, set()))  # 2) faz treino? prof? foto?
-            modal, _desc = contrato_modalidade(key, mat)       # 3) modalidade (via contrato)
-            return (uk, cid, ua, faz, pnome, pcod, foto, modal)
-        with ThreadPoolExecutor(max_workers=6) as ex:          # <= gentil com a API (3 chamadas/aluno)
-            for uk, cid, ua, faz, pnome, pcod, foto, modal in ex.map(_one, tarefas):
+            h = _mhash(mat)                                    # 3) modalidade: cache ou contrato
+            ce = modal_cache.get(h)
+            if ce and _fresh(ce.get("d")):
+                modal, src = ce.get("m"), "cache"
+            else:
+                modal, _desc = contrato_modalidade(key, mat)
+                if modal is None and ce:                       # falhou -> usa valor antigo, re-tenta depois
+                    modal, src = ce.get("m"), "stale"
+                else:
+                    src = "fetch"
+            return (uk, cid, ua, faz, pnome, pcod, foto, modal, mat, src)
+        with ThreadPoolExecutor(max_workers=6) as ex:          # <= gentil com a API (ate 3 chamadas/aluno)
+            for uk, cid, ua, faz, pnome, pcod, foto, modal, mat, src in ex.map(_one, tarefas):
                 app_res[(uk, cid)] = (ua, faz, pnome, pcod, foto, modal)
+                src_cnt[src] = src_cnt.get(src, 0) + 1
+                h = _mhash(mat)
+                if src == "fetch" and modal is not None:
+                    new_cache[h] = {"m": modal, "d": HOJE}
+                elif src == "cache":
+                    new_cache[h] = modal_cache.get(h, {"m": modal, "d": HOJE})
+                elif src == "stale" and modal_cache.get(h):
+                    new_cache[h] = modal_cache[h]              # mantem data antiga -> re-consulta na proxima
         # 2a tentativa (sequencial e leve) so para os que falharam no uso do app
         faltas = [(uk, key, cid, mat) for (uk, key, cid, mat) in tarefas if app_res.get((uk, cid), (None,)*6)[0] is None]
         if faltas:
@@ -457,6 +503,9 @@ def main():
             n_treino += 1 if faz is True else 0
         print("[app] usaApp -> sim %d | nao %d | falha %d | fazTreino %d (de %d ativos)"
               % (n_true, n_false, n_fail, n_treino, len(tarefas)), file=sys.stderr)
+        save_modal_cache(new_cache)
+        print("[modalidade] cache -> %d hit | %d fetch | %d stale | %d entradas salvas (TTL %dd)"
+              % (src_cnt["cache"], src_cnt["fetch"], src_cnt["stale"], len(new_cache), MODAL_TTL), file=sys.stderr)
 
     # ---- FASE 3: montar alunos + resumo por unidade ----
     for uk in sorted(resultados):
