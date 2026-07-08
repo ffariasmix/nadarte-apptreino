@@ -235,9 +235,18 @@ window.DATA = /*__DATA__*/null;
 
   function renderGeral(){
     const totAl=sum('totalAlunos');
+    // Nota do treino (estrelas) e aderência (gerados x executados)
+    const est=[1,2,3,4,5].map(i=>sum('nr'+i+'estrelas'));
+    const ntot=est.reduce((a,b)=>a+b,0);
+    const nmed=ntot? est.reduce((a,c,i)=>a+(i+1)*c,0)/ntot : null;
+    const nota1=v=>(v==null?'—':(Math.round(v*100)/100).toLocaleString('pt-BR'));
+    const ger=sum('treinosGerados'), exe=sum('treinosExecutados');
+    const execPct= ger? exe/ger*100 : null;
     const K=[
       {n:'Alunos na base',dot:'#2D2D2D',v:fmt(totAl),s:fmt(sum('totalAlunosAtivos'))+' ativos'},
       {n:'Uso do App Treino',dot:'#7A5AA8',v:pct(wavg('percUtilizamApp','totalAlunos')),s:'% dos alunos que usam o app'},
+      {n:'Nota do treino',dot:'#F2C94C',v:nmed==null?'—':nota1(nmed)+'★',s:fmt(ntot)+' avaliações no app'},
+      {n:'Execução (aderência)',dot:'#5BAD6F',v:pct(execPct),s:fmt(exe)+' de '+fmt(ger)+' treinos prescritos'},
       {n:'Treinos em dia',dot:'#5BAD6F',v:fmt(sum('totalTreinosEmDia')),s:pct(wavg('percentualEmDia','totalAlunos'))+' da base'},
       {n:'Treinos vencidos',dot:'#D64545',v:fmt(sum('totalTreinosVencidos')),s:'a renovar: '+fmt(sum('totalTreinosRenovar'))},
       {n:'Avaliações realizadas',dot:'#3E6DAA',v:fmt(sum('avaliacoesRealizadas')),s:'últimos 12 meses'},
@@ -256,6 +265,12 @@ window.DATA = /*__DATA__*/null;
     h+='<div class="sec">Gráficos</div><div class="grid2">';
     h+='<div class="panel"><h3>Uso do app por unidade</h3><p class="sub">% de alunos que usam o App Treino</p>'
        +hbars(ALL.map(u=>({label:u.nome,value:N(u.percUtilizamApp)})),'#7A5AA8',v=>pct(v))+'</div>';
+    h+='<div class="panel"><h3>Nota do treino (estrelas)</h3><p class="sub">avaliações dos alunos no app — '+(state.unit==='all'?'rede':uName(state.unit))+'</p>'
+       +'<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">'
+       +`<div style="text-align:center;min-width:84px"><div style="font-size:38px;font-weight:800;line-height:1;color:#E0A400">${nmed==null?'—':nota1(nmed)}</div><div style="color:var(--muted);font-size:12px;margin-top:4px">★ média · ${fmt(ntot)} aval.</div></div>`
+       +'<div style="flex:1;min-width:190px">'
+       +[5,4,3,2,1].map(s=>{const c=est[s-1],p=ntot?c/ntot*100:0; return `<div style="display:flex;align-items:center;gap:8px;margin:5px 0"><span style="width:24px;font-size:12px;color:var(--muted)">${s}★</span><div class="bar"><i style="width:${p}%;background:#F2C94C"></i></div><span style="width:54px;text-align:right;font-size:12px;font-weight:700">${fmt(c)}</span></div>`;}).join('')
+       +'</div></div></div>';
     h+='<div class="panel"><h3>Situação das fichas</h3><p class="sub">na seleção atual</p>'
        +donut([{label:'Em dia',value:sum('totalTreinosEmDia'),color:'#5BAD6F'},{label:'Vencidas',value:sum('totalTreinosVencidos'),color:'#D64545'},{label:'A renovar',value:sum('totalTreinosRenovar'),color:'#F2C94C'}])+'</div>';
     h+='<div class="panel"><h3>Treinos vencidos por unidade</h3><p class="sub">fichas a renovar</p>'

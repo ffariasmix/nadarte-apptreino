@@ -354,6 +354,7 @@ def coleta_unidade(uk, ulabel, key):
     cart  = content(key, "/psec/treino-bi/carteira")
     aprov = content(key, "/psec/treino-bi/contagem-treinos-aprovar")
     avf   = content(key, "/psec/avaliacao-fisica-bi?dataInicio=%d&dataFim=%d" % (di, df))
+    gexec = content(key, "/psec/treino-bi/gerados-executados")   # aderencia: gerados vs executados
 
     # Professores 360
     profs = []
@@ -397,6 +398,11 @@ def coleta_unidade(uk, ulabel, key):
     print("  [ativos] %s: %d ativos (carteira %d | BI diz %s)" % (
         ulabel, len(ativos), len(carteira), "-" if bi_total is None else str(int(bi_total))), file=sys.stderr)
 
+    # Nota do treino (estrelas) — vem de graca no /psec/treino-bi/dados (KPI7)
+    _estr = {i: num(dados, "nr%destrelas" % i) for i in range(1, 6)}
+    _ntot = sum(_estr.values())
+    _nmed = (sum(i * _estr[i] for i in range(1, 6)) / _ntot) if _ntot else None
+
     unidade = {
         "id": uk, "nome": ulabel,
         "totalAlunos": num(dados, "totalAlunos"),
@@ -420,6 +426,16 @@ def coleta_unidade(uk, ulabel, key):
         "avaliacoesReavaliacoes": num(avf, "reavaliacoes"),
         "avaliacoesPrevistas": num(avf, "previstas"),
         "avaliacoesSem": num(avf, "semAvaliacao"),
+        # ---- Nota do treino (estrelas) — KPI7 ----
+        "nr1estrelas": _estr[1], "nr2estrelas": _estr[2], "nr3estrelas": _estr[3],
+        "nr4estrelas": _estr[4], "nr5estrelas": _estr[5],
+        "notaMedia": round(_nmed, 2) if _nmed is not None else None,
+        "notaTotal": int(_ntot),
+        "percentualAvaliacoes": num(dados, "percentualAvaliacoes"),
+        # ---- Execucao / aderencia (gerados vs executados) — KPI1 ----
+        "treinosGerados": num(gexec, "totalTreinosGerados"),
+        "treinosExecutados": num(gexec, "totalTreinosExecutados"),
+        "percentualExecucao": num(gexec, "percentualExecucao"),
     }
     # codigos dos professores de treino desta unidade (p/ o join do vinculo do aluno)
     treino_codes = set(str(p["id"]) for p in profs if p.get("id") is not None)
