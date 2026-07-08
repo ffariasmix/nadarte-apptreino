@@ -147,7 +147,6 @@
     <button class="tab" data-v="profs">Professores 360º</button>
     <button class="tab" data-v="crm">CRM 360º (alunos)</button>
     <button class="tab" data-v="score">Score &amp; Ações</button>
-    <button class="tab" data-v="fase2">Fase 2 (roadmap)</button>
     <button class="tab" data-v="metodo">Metodologia &amp; API</button>
   </div>
 </div></div>
@@ -157,7 +156,6 @@
   <section class="view" id="v-profs"></section>
   <section class="view" id="v-crm"></section>
   <section class="view" id="v-score"></section>
-  <section class="view" id="v-fase2"></section>
   <section class="view" id="v-metodo"></section>
 </main>
 <footer class="wrap">Dados ao vivo da API Pacto (BI Treino / Avaliação Física) · Connect-IN Digital · atualização automática via GitHub Actions</footer>
@@ -182,6 +180,20 @@ window.DATA = /*__DATA__*/null;
   const sel = () => state.unit==='all' ? ALL : ALL.filter(u=>u.id===state.unit);
   const sum = k => sel().reduce((a,u)=>a+N(u[k]),0);
   const wavg = (k,w) => { let n=0,d=0; sel().forEach(u=>{const ww=N(u[w]); if(u[k]!=null){n+=Number(u[k])*ww; d+=ww;}}); return d?n/d:null; };
+  // Guard-rail automático: média ponderada que EXCLUI outliers (valor atípico vs. mediana das demais).
+  // Auto-liga quando há anomalia e auto-desliga quando o dado normaliza. Vale p/ qualquer unidade.
+  const sumOf = (uu,k) => uu.reduce((a,u)=>a+N(u[k]),0);
+  const wavgOf = (uu,k,w) => { let n=0,d=0; uu.forEach(u=>{const ww=N(u[w]); if(u[k]!=null){n+=Number(u[k])*ww; d+=ww;}}); return d?n/d:null; };
+  const wavgRobusto = (k,w) => {
+    const arr = sel().filter(u=>u[k]!=null).map(u=>({nome:u.nome, v:Number(u[k]), w:N(u[w])}));
+    if(arr.length<3) return {v: wavg(k,w), fora:[]};
+    const ord = arr.map(x=>x.v).slice().sort((a,b)=>a-b);
+    const med = ord[Math.floor(ord.length/2)] || 0;
+    const fora=[], ok=[];
+    arr.forEach(x=>{ (med>0 && x.v > med*4 && x.v > 180) ? fora.push(x.nome) : ok.push(x); });
+    let n=0,d=0; ok.forEach(x=>{n+=x.v*x.w; d+=x.w;});
+    return {v: d? n/d : null, fora};
+  };
 
   function hbars(rows, color, fmtVal){
     const max=Math.max(...rows.map(r=>r.value),1), w=520,padL=104,padR=64,rowH=32,h=rows.length*rowH+6;
@@ -244,6 +256,7 @@ window.DATA = /*__DATA__*/null;
     const DIAS=['segunda','terca','quarta','quinta','sexta','sabado','domingo'];
     const DLAB={segunda:'Seg',terca:'Ter',quarta:'Qua',quinta:'Qui',sexta:'Sex',sabado:'Sáb',domingo:'Dom'};
     const execDia=DIAS.map(d=>({dia:d, v: sel().reduce((a,u)=>a+((u.execucoesPorDia||{})[d]||0),0)}));
+    const tf=wavgRobusto('tempoMedioPermanenciaTreino','totalAlunos');   // guard-rail de outlier
     const K=[
       {n:'Alunos na base',dot:'#2D2D2D',v:fmt(totAl),s:fmt(sum('totalAlunosAtivos'))+' ativos'},
       {n:'Uso do App Treino',dot:'#7A5AA8',v:pct(wavg('percUtilizamApp','totalAlunos')),s:'% dos alunos que usam o app'},
@@ -254,11 +267,12 @@ window.DATA = /*__DATA__*/null;
       {n:'Avaliações realizadas',dot:'#3E6DAA',v:fmt(sum('avaliacoesRealizadas')),s:'últimos 12 meses'},
       {n:'Avaliações vencidas',dot:'#F2C94C',v:fmt(sum('avaliacoesAtrasadas')),s:'atrasadas / reavaliar'},
       {n:'Atendimento (professores)',dot:'#0EA5A0',v:fmt(sum('acompanhamentoEm')),s:'alunos em acompanhamento'},
-      {n:'Tempo médio de ficha',dot:'#E8521A',v:fmt(wavg('tempoMedioPermanenciaTreino','totalAlunos')),s:'dias de permanência (média)'},
+      {n:'Tempo médio de ficha',dot:'#E8521A',v:fmt(tf.v),s:'dias de permanência (média)'},
     ];
     let h='<div class="sec">'+(state.unit==='all'?'Panorama da rede':'Unidade: '+uName(state.unit))+'</div><div class="kgrid">';
     h+=K.map(c=>`<div class="kpi"><div class="n"><span class="dot" style="background:${c.dot}"></span>${c.n}</div><div class="v">${c.v}</div><div class="s">${c.s}</div></div>`).join('')+'</div>';
-    h+=indiceHero();
+    if(tf.fora.length) h+='<div class="note">⚠ <b>Dado atípico detectado (automático):</b> '+tf.fora.join(', ')+' com valor fora do padrão em <b>"Tempo médio de ficha"</b> — excluído da média da rede até os dados normalizarem no Pacto. A mensagem some sozinha quando o número voltar ao normal.</div>';
+    h+=metasPanel();
     if(D.alunos && D.alunos.length){
       const alvo=crmBase().length, base=crmBaseFull().length, fora=base-alvo;
       h+='<div class="sec">Modalidade — público-alvo do App Treino</div>'+modPanel(crmBase())
@@ -300,9 +314,57 @@ window.DATA = /*__DATA__*/null;
       +`<div style="color:var(--muted);font-size:11.5px;margin-top:7px">Score por aluno = uso do app + faz treino + saúde do contrato. Fila de ações na aba <b>Score &amp; Ações</b>.</div></div>`
       +'</div></div>';
   }
+  // ---------- Índice de METAS (0–100) — pesos definidos pela rede ----------
+  function metasFor(unitId){
+    const uu = unitId==='all' ? ALL : ALL.filter(u=>u.id===unitId);
+    const eligB = (D.alunos||[]).filter(a => (unitId==='all'||a.unit===unitId) && ELEG(a));  // público-alvo
+    const el = eligB.length||1;
+    const usoApp = eligB.filter(a=>a.usaApp===true).length/el*100;
+    const treino = wavgOf(uu,'percentualEmDia','totalAlunos')||0;
+    const rea=sumOf(uu,'avaliacoesRealizadas'), atr=sumOf(uu,'avaliacoesAtrasadas');
+    const aval=(rea+atr)? rea/(rea+atr)*100 : 0;
+    const atd=sumOf(uu,'totalAlunos')? sumOf(uu,'acompanhamentoEm')/sumOf(uu,'totalAlunos')*100 : 0;
+    const defs=[
+      {k:'Uso do App',v:usoApp,alvo:100,peso:0.30},
+      {k:'Treinos em dia',v:treino,alvo:85,peso:0.30},
+      {k:'Avaliações em dia',v:aval,alvo:75,peso:0.20},
+      {k:'Atendimento',v:atd,alvo:100,peso:0.20},
+    ];
+    defs.forEach(d=>d.at=Math.min(100, d.alvo? d.v/d.alvo*100 : 0));
+    return {defs, indice:Math.round(defs.reduce((a,d)=>a+d.peso*d.at,0)), eleg:eligB.length};
+  }
+  function metaFarol(at){ return at>=100?'#5BAD6F':at>=70?'#F2C94C':'#D64545'; }
+  function metasPanel(){
+    if(!D.alunos || !D.alunos.length) return '';
+    const m=metasFor(state.unit);
+    let h='<div class="sec">Índice de metas (0–100)</div><div class="panel"><div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">'
+      +`<div style="text-align:center;min-width:96px"><div style="font-size:44px;font-weight:800;line-height:1;color:${metaFarol(m.indice)}">${m.indice}</div><div style="color:var(--muted);font-size:12px;margin-top:5px">índice ponderado</div></div>`
+      +'<div style="flex:1;min-width:300px">';
+    h+=m.defs.map(d=>`<div style="display:flex;align-items:center;gap:10px;margin:8px 0">
+      <div style="width:134px;font-size:12.5px;font-weight:600">${d.k} <span style="color:var(--muted);font-weight:400">${Math.round(d.peso*100)}%</span></div>
+      <div class="bar"><i style="width:${Math.min(100,d.alvo?d.v/d.alvo*100:0)}%;background:${metaFarol(d.at)}"></i></div>
+      <div style="width:132px;text-align:right;font-size:12px"><b>${pct(d.v)}</b> <span style="color:var(--muted)">/ alvo ${d.alvo}%</span></div></div>`).join('');
+    h+='</div></div>';
+    const atd=m.defs.find(d=>d.k==='Atendimento');
+    h+='<div class="note"><b>Índice de metas</b> = média ponderada do atingimento — <b>Uso do App 30%</b> (aptos com treino e cadastro no app · alvo 100%) · <b>Treinos em dia 30%</b> (alvo 85%) · <b>Avaliações em dia 20%</b> (alvo ≥75% dos aptos) · <b>Atendimento 20%</b> (alvo: ≥1 atendimento/mês por aluno). A <b>nota do treino (NPS)</b> é indicador à parte — não entra no índice. Verde = meta batida · amarelo = perto · vermelho = distante.'
+      + ((atd && atd.v<5) ? ' <b>Atendimento vem baixo</b> porque os professores ainda não registram atendimento pelo App Treino — é a meta a acelerar (por isso tem peso alto).' : '')
+      + '</div>';
+    return h;
+  }
 
   function renderUnidades(){
-    let h='<div class="sec">Unidades</div><div class="ugrid">';
+    let h='';
+    if(D.alunos && D.alunos.length){
+      h+='<div class="sec">Índice de metas por unidade</div><div class="panel">';
+      const rows=ALL.map(u=>({nome:u.nome, m:metasFor(u.id).indice, nota:u.notaMedia})).sort((a,b)=>b.m-a.m);
+      h+=rows.map(r=>`<div style="display:flex;align-items:center;gap:12px;margin:7px 0">
+        <div style="width:112px;font-size:12.5px;font-weight:600">${r.nome}</div>
+        <div class="bar" style="max-width:340px"><i style="width:${r.m}%;background:${metaFarol(r.m)}"></i></div>
+        <div style="width:40px;text-align:right;font-weight:800;font-size:15px">${r.m}</div>
+        <div style="width:74px;text-align:right;font-size:12px;color:var(--muted)">${r.nota!=null?(Math.round(r.nota*100)/100).toLocaleString('pt-BR')+'★':'—'}</div></div>`).join('');
+      h+='<p class="sub" style="margin:10px 2px 0">Barra = índice de metas (0–100) · número = índice · ★ = nota do treino (indicador à parte).</p></div>';
+    }
+    h+='<div class="sec">Unidades</div><div class="ugrid">';
     h+=ALL.map(u=>`<div class="ucard"><div class="un">${u.nome}</div><div class="ual">${fmt(u.totalAlunos)} alunos · ${fmt(u.totalAlunosAtivos)} ativos</div>
       <div class="urow"><span>Uso do app</span><b>${pct(u.percUtilizamApp)}</b></div>
       <div class="urow"><span>Treinos em dia</span><b>${fmt(u.totalTreinosEmDia)}</b></div>
@@ -369,6 +431,9 @@ window.DATA = /*__DATA__*/null;
     P=P.map(p=>{const tot=N(p.comTreino)+N(p.semTreino); const cob=tot>0?N(p.comTreino)/tot:0;
       return Object.assign({},p,{indice:Math.round(0.7*N(p.pctEmDia)+0.3*cob*100)});});
     P.sort((a,b)=>b.indice-a.indice);
+    // separa registros que NÃO são professores (fora do ranking e das médias)
+    const pseudo={}; PSEUDO_ORDER.forEach(k=>pseudo[k]={n:0,carteira:0});
+    P=P.filter(p=>{const t=NAOPROF(p.nome); if(t){pseudo[t].n++; pseudo[t].carteira+=N(p.carteiraReal); return false;} return true;});
     const el=document.getElementById('v-profs');
     if(!P.length){ el.innerHTML='<div class="empty" style="margin-top:20px">Sem professores com vínculo de treino nesta seleção.</div>'; return; }
     const medal=r=>r===0?'🥇':r===1?'🥈':r===2?'🥉':(r+1)+'º';
@@ -389,6 +454,12 @@ window.DATA = /*__DATA__*/null;
       <td><span class="pill" style="background:${bg(p.indice)};color:${col(p.indice)}">${p.indice}</span></td></tr>`).join('');
     h+='</tbody></table></div></div>';
     h+='<div class="note"><b>Índice de atuação</b> = 70% do "% de fichas em dia" + 30% da cobertura. Faixas: Referência ≥ 70 · Regular 45–69 · Atenção &lt; 45. <b>Carteira</b> = alunos ativos vinculados ao professor (via <code>/v1/cliente.vinculos</code>) — clique na linha para ver a lista. Fonte: <code>bi-professores-vinculos</code>. Página com login — por isso exibe nomes.</div>';
+    const totPseudo=PSEUDO_ORDER.reduce((a,k)=>a+pseudo[k].n,0);
+    if(totPseudo){
+      h+='<div class="sec">Atendimento fora do ranking</div><div class="ugrid">';
+      h+=PSEUDO_ORDER.filter(k=>pseudo[k].n>0).map(k=>`<div class="ucard"><div class="un">${k}</div><div class="ual">${fmt(pseudo[k].n)} registro(s)</div><div class="urow"><span>Alunos na carteira</span><b>${fmt(pseudo[k].carteira)}</b></div></div>`).join('');
+      h+='</div><div class="note"><b>Fora do ranking:</b> Personal Externo, Sem Professor, Treino por IA e Gestão <b>não entram</b> no ranking nem nas médias de professores — são públicos distintos que acompanhamos à parte (ex.: quem é atendido por personal, quem optou por não ter professor, e a adesão ao Treino por IA).</div>';
+    }
     el.innerHTML=h;
     el.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>profDrawer(tr.dataset.pid));
   }
@@ -398,7 +469,7 @@ window.DATA = /*__DATA__*/null;
     const alunos=(D.alunos||[]).filter(a=>String(a.professorId)===String(pid))
       .sort((a,b)=>(ord[a.faixa]??9)-(ord[b.faixa]??9));
     let h=`<button class="pmx" onclick="document.getElementById('pmodal').classList.remove('on')">&times;</button>`;
-    h+=`<div style="display:flex;align-items:center;gap:12px;margin:0 0 14px"><span class="av" style="width:44px;height:44px;font-size:15px">${avatar(prof).replace('<span class="av">','').replace(/<\/span>$/,'')}</span><div><h3 style="margin:0 0 2px;font-size:16px">${esc(prof.nome)||'Professor'}</h3><p class="sub" style="margin:0">${uName(prof.unit)} · ${fmt(alunos.length)} alunos na carteira</p></div></div>`;
+    h+=`<div style="display:flex;align-items:center;gap:12px;margin:0 0 14px">${avatar(prof)}<div><h3 style="margin:0 0 2px;font-size:16px">${esc(prof.nome)||'Professor'}</h3><p class="sub" style="margin:0">${uName(prof.unit)} · ${fmt(alunos.length)} alunos na carteira</p></div></div>`;
     if(!alunos.length){ h+='<div class="empty" style="border:none;padding:24px">Sem alunos vinculados nesta coleta.</div>'; }
     else { h+='<div class="tbl"><div class="scroll" style="max-height:56vh"><table><thead><tr><th>Aluno</th><th>Usa app</th><th>Contrato</th><th>Faixa</th></tr></thead><tbody>'
       +alunos.map(a=>{const f=FA[a.faixa]||['—','']; return `<tr><td><div class="aluno-cell"><span class="av">${iniciais(a.nome)}</span><div><div class="nm">${esc(a.nome)}</div><div class="ct">${esc(a.email||'')}</div></div></div></td><td>${appPill(a.usaApp)}</td><td>${contratoPill(a.diasContrato)}</td><td><span class="pill ${f[1]}">${f[0]}</span></td></tr>`;}).join('')
@@ -410,6 +481,15 @@ window.DATA = /*__DATA__*/null;
   // ---------- CRM 360º por aluno ----------
   const esc = s => (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const iniciais = nome => { const p=(nome||'').trim().split(/\s+/).filter(Boolean); return ((p[0]||'?')[0]+(p.length>1?p[p.length-1][0]:'')).toUpperCase(); };
+  // Classifica registros que NÃO são professores (ficam fora do ranking/médias)
+  const _upp = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+  const NAOPROF = nome => { const u=' '+_upp(nome)+' ';
+    if(/PERSONAL EXTERNO/.test(u)) return 'Personal Externo';
+    if(/TREINO POR IA|\bIA\b/.test(u)) return 'Treino por IA';
+    if(/PACTO|METODO DE GESTAO|\bGESTAO\b/.test(u)) return 'Gestão';
+    if(/NAO QUER PROFESSOR|SEM PROFESSOR|SOMENTE NATACAO/.test(u)) return 'Sem Professor';
+    return null; };
+  const PSEUDO_ORDER=['Personal Externo','Sem Professor','Treino por IA','Gestão'];
   const FA = {engajado:['Engajado','c-green'], morno:['Morno','c-amber'], risco:['Em risco','c-red']};
   function appPill(v){ return v===true?'<span class="pill c-green">Sim</span>':v===false?'<span class="pill c-red">Não</span>':'<span class="pill" style="background:#EEE;color:#999">—</span>'; }
   function fazPill(v){ return v===true?'<span class="pill c-green">Sim</span>':v===false?'<span class="pill c-gray">Não</span>':'<span class="pill" style="background:#EEE;color:#999">—</span>'; }
@@ -624,7 +704,7 @@ window.DATA = /*__DATA__*/null;
     document.getElementById('v-'+state.tab).classList.add('on');
   });
   document.getElementById('pmodal').onclick=e=>{ if(e.target.id==='pmodal') document.getElementById('pmodal').classList.remove('on'); };
-  renderChips(); renderGeral(); renderUnidades(); renderProfs(); renderCRM(); renderScore(); renderFase2(); renderMetodo();
+  renderChips(); renderGeral(); renderUnidades(); renderProfs(); renderCRM(); renderScore(); renderMetodo();
 })();
 </script>
 <script>
