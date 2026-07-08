@@ -291,20 +291,20 @@
  {
   "data": "2026-07-08",
   "rede": {
-   "usoApp": 41.0,
-   "emDiaPct": 62.1,
-   "vencidos": 901,
+   "usoApp": 41.1,
+   "emDiaPct": 62.7,
+   "vencidos": 887,
    "avalVencidas": 504,
    "ativos": 4999,
-   "engajado": 1107,
-   "morno": 3473,
-   "risco": 419,
+   "engajado": 1108,
+   "morno": 3477,
+   "risco": 414,
    "semdado": 0,
-   "appSim": 1209,
-   "appNao": 3790,
+   "appSim": 1210,
+   "appNao": 3789,
    "appFalha": 0,
-   "fazTreino": 3513,
-   "naoFazTreino": 1480
+   "fazTreino": 3509,
+   "naoFazTreino": 1490
   },
   "unidades": [
    {
@@ -316,13 +316,13 @@
    {
     "id": "716Norte",
     "nome": "716 Norte",
-    "usoApp": 67.0,
-    "emDiaPct": 50.0
+    "usoApp": 67.1,
+    "emDiaPct": 52.0
    },
    {
     "id": "905Sul",
     "nome": "905 Sul",
-    "usoApp": 36.1,
+    "usoApp": 36.3,
     "emDiaPct": 72.0
    },
    {
@@ -335,13 +335,13 @@
     "id": "LagoSul",
     "nome": "Lago Sul",
     "usoApp": 15.1,
-    "emDiaPct": 86.0
+    "emDiaPct": 87.0
    },
    {
     "id": "Natal",
     "nome": "Natal/RN",
     "usoApp": 58.5,
-    "emDiaPct": 50.0
+    "emDiaPct": 52.0
    }
   ]
  }
