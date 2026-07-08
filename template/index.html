@@ -240,13 +240,15 @@ window.DATA = /*__DATA__*/null;
     const ntot=est.reduce((a,b)=>a+b,0);
     const nmed=ntot? est.reduce((a,c,i)=>a+(i+1)*c,0)/ntot : null;
     const nota1=v=>(v==null?'—':(Math.round(v*100)/100).toLocaleString('pt-BR'));
-    const ger=sum('treinosGerados'), exe=sum('treinosExecutados');
-    const execPct= ger? exe/ger*100 : null;
+    const execSem=sum('execucoesSemana');
+    const DIAS=['segunda','terca','quarta','quinta','sexta','sabado','domingo'];
+    const DLAB={segunda:'Seg',terca:'Ter',quarta:'Qua',quinta:'Qui',sexta:'Sex',sabado:'Sáb',domingo:'Dom'};
+    const execDia=DIAS.map(d=>({dia:d, v: sel().reduce((a,u)=>a+((u.execucoesPorDia||{})[d]||0),0)}));
     const K=[
       {n:'Alunos na base',dot:'#2D2D2D',v:fmt(totAl),s:fmt(sum('totalAlunosAtivos'))+' ativos'},
       {n:'Uso do App Treino',dot:'#7A5AA8',v:pct(wavg('percUtilizamApp','totalAlunos')),s:'% dos alunos que usam o app'},
       {n:'Nota do treino',dot:'#F2C94C',v:nmed==null?'—':nota1(nmed)+'★',s:fmt(ntot)+' avaliações no app'},
-      {n:'Execução (aderência)',dot:'#5BAD6F',v:pct(execPct),s:fmt(exe)+' de '+fmt(ger)+' treinos prescritos'},
+      {n:'Execuções (semana)',dot:'#5BAD6F',v:fmt(execSem),s:'treinos realizados numa semana típica'},
       {n:'Treinos em dia',dot:'#5BAD6F',v:fmt(sum('totalTreinosEmDia')),s:pct(wavg('percentualEmDia','totalAlunos'))+' da base'},
       {n:'Treinos vencidos',dot:'#D64545',v:fmt(sum('totalTreinosVencidos')),s:'a renovar: '+fmt(sum('totalTreinosRenovar'))},
       {n:'Avaliações realizadas',dot:'#3E6DAA',v:fmt(sum('avaliacoesRealizadas')),s:'últimos 12 meses'},
@@ -271,6 +273,10 @@ window.DATA = /*__DATA__*/null;
        +'<div style="flex:1;min-width:190px">'
        +[5,4,3,2,1].map(s=>{const c=est[s-1],p=ntot?c/ntot*100:0; return `<div style="display:flex;align-items:center;gap:8px;margin:5px 0"><span style="width:24px;font-size:12px;color:var(--muted)">${s}★</span><div class="bar"><i style="width:${p}%;background:#F2C94C"></i></div><span style="width:54px;text-align:right;font-size:12px;font-weight:700">${fmt(c)}</span></div>`;}).join('')
        +'</div></div></div>';
+    (function(){const mx=Math.max(1,...execDia.map(x=>x.v));
+     h+='<div class="panel"><h3>Execuções por dia da semana</h3><p class="sub">treinos realizados — '+(state.unit==='all'?'rede':uName(state.unit))+' · '+fmt(execSem)+' na semana</p>'
+       +execDia.map(x=>`<div style="display:flex;align-items:center;gap:10px;margin:5px 0"><span style="width:34px;font-size:12px;color:var(--muted)">${DLAB[x.dia]}</span><div class="bar"><i style="width:${x.v/mx*100}%;background:#5BAD6F"></i></div><span style="width:54px;text-align:right;font-size:12px;font-weight:700">${fmt(x.v)}</span></div>`).join('')
+       +'</div>';})();
     h+='<div class="panel"><h3>Situação das fichas</h3><p class="sub">na seleção atual</p>'
        +donut([{label:'Em dia',value:sum('totalTreinosEmDia'),color:'#5BAD6F'},{label:'Vencidas',value:sum('totalTreinosVencidos'),color:'#D64545'},{label:'A renovar',value:sum('totalTreinosRenovar'),color:'#F2C94C'}])+'</div>';
     h+='<div class="panel"><h3>Treinos vencidos por unidade</h3><p class="sub">fichas a renovar</p>'

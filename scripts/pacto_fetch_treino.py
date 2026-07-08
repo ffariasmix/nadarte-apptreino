@@ -354,7 +354,7 @@ def coleta_unidade(uk, ulabel, key):
     cart  = content(key, "/psec/treino-bi/carteira")
     aprov = content(key, "/psec/treino-bi/contagem-treinos-aprovar")
     avf   = content(key, "/psec/avaliacao-fisica-bi?dataInicio=%d&dataFim=%d" % (di, df))
-    gexec = content(key, "/psec/treino-bi/gerados-executados")   # aderencia: gerados vs executados
+    trbi  = content(key, "/psec/treino-bi/treinamento")   # execucoes por dia da semana (mediaExecucao)
 
     # Professores 360
     profs = []
@@ -402,6 +402,11 @@ def coleta_unidade(uk, ulabel, key):
     _estr = {i: num(dados, "nr%destrelas" % i) for i in range(1, 6)}
     _ntot = sum(_estr.values())
     _nmed = (sum(i * _estr[i] for i in range(1, 6)) / _ntot) if _ntot else None
+    # Execucoes por dia da semana (KPI1) — treinamento.mediaExecucao[dia].total
+    _me = (trbi.get("mediaExecucao") if isinstance(trbi, dict) else None) or {}
+    _DIAS = ["segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"]
+    _execDia = {d: int(num((_me.get(d) or {}), "total")) for d in _DIAS}
+    _execSem = sum(_execDia.values())
 
     unidade = {
         "id": uk, "nome": ulabel,
@@ -432,10 +437,9 @@ def coleta_unidade(uk, ulabel, key):
         "notaMedia": round(_nmed, 2) if _nmed is not None else None,
         "notaTotal": int(_ntot),
         "percentualAvaliacoes": num(dados, "percentualAvaliacoes"),
-        # ---- Execucao / aderencia (gerados vs executados) — KPI1 ----
-        "treinosGerados": num(gexec, "totalTreinosGerados"),
-        "treinosExecutados": num(gexec, "totalTreinosExecutados"),
-        "percentualExecucao": num(gexec, "percentualExecucao"),
+        # ---- Execucoes por dia da semana (treinos realizados) — KPI1 ----
+        "execucoesSemana": _execSem,
+        "execucoesPorDia": _execDia,
     }
     # codigos dos professores de treino desta unidade (p/ o join do vinculo do aluno)
     treino_codes = set(str(p["id"]) for p in profs if p.get("id") is not None)
