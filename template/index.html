@@ -87,6 +87,13 @@
   .avimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   .aluno-cell{display:flex;align-items:center;gap:10px}.aluno-cell .nm{font-weight:700}.aluno-cell .ct{font-size:11px;color:var(--muted)}
   .subf{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:14px 0 4px}
+  .filterbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow);margin:14px 0}
+  .fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .fld>label{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+  .fsel,.finp{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:var(--card);color:var(--ink);width:100%;max-width:100%}
+  .fsel:focus,.finp:focus{outline:none;border-color:var(--orange)}
+  th.sortable{cursor:pointer;user-select:none}th.sortable:hover{color:var(--ink)}
+  th .sar{font-size:9px;margin-left:3px;color:var(--orange)}
   .srch{border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:12.5px;font-family:inherit;min-width:180px;flex:1;max-width:280px}
   .srch:focus{outline:none;border-color:var(--orange)}
   .pager{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;flex-wrap:wrap;border-top:1px solid var(--line)}
@@ -100,7 +107,18 @@
   .modalc{background:#fff;border-radius:16px;max-width:640px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.3);max-height:88vh;overflow:auto;position:relative}
   .pmx{position:absolute;top:14px;right:16px;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1}
   @media(max-width:900px){.kgrid{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}.ugrid{grid-template-columns:1fr}.road{grid-template-columns:1fr}}
-  @media(max-width:460px){.kgrid{grid-template-columns:1fr}.asof{margin-left:0;width:100%}}
+  @media(max-width:640px){
+    .filterbar{grid-template-columns:1fr 1fr}
+    .rtable table,.rtable thead,.rtable tbody,.rtable tr,.rtable td{display:block}
+    .rtable thead{position:absolute;left:-9999px;height:0;overflow:hidden}
+    .rtable tr{border:1px solid var(--line);border-radius:12px;margin:0 6px 10px;padding:4px 2px;background:var(--card)}
+    .rtable td{border:none;padding:7px 12px;display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:right}
+    .rtable td::before{content:attr(data-label);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);text-align:left;flex:0 0 auto}
+    .rtable td:first-child{justify-content:flex-start;text-align:left}
+    .rtable td:first-child::before{display:none}
+    .rtable .pager{flex-direction:column;align-items:stretch;gap:8px}
+  }
+  @media(max-width:460px){.kgrid{grid-template-columns:1fr}.asof{margin-left:0;width:100%}.filterbar{grid-template-columns:1fr}}
   /* botão de alternar tema */
   .tbtn{background:var(--card);border:1px solid var(--line);border-radius:999px;width:34px;height:34px;cursor:pointer;font-size:15px;line-height:1;display:inline-flex;align-items:center;justify-content:center;color:var(--ink);flex:0 0 auto;margin-left:10px;transition:var(--transition-base,all .2s ease)}
   .tbtn:hover{border-color:var(--orange)}
@@ -176,7 +194,7 @@ window.DATA = /*__DATA__*/null;
   const N = v => Number(v)||0;
   if(D.gerado_em){ try{ document.getElementById('asof').textContent = new Date(D.gerado_em).toLocaleString('pt-BR'); }catch(e){} }
 
-  let state = {unit:'all', tab:'geral', crmFaixa:'all', crmPub:'all', crmMod:'all', crmQ:'', crmPage:1, scoreIni:'all', scorePage:1};
+  let state = {unit:'all', tab:'geral', crmFaixa:'all', crmPub:'all', crmMod:'all', crmProf:'all', crmContrato:'all', crmQ:'', crmPage:1, crmSort:{k:null,dir:1}, profSort:{k:null,dir:1}, scoreIni:'all', scoreProf:'all', scoreContrato:'all', scoreQ:'', scorePage:1, scoreSort:{k:null,dir:1}};
   const sel = () => state.unit==='all' ? ALL : ALL.filter(u=>u.id===state.unit);
   const sum = k => sel().reduce((a,u)=>a+N(u[k]),0);
   const wavg = (k,w) => { let n=0,d=0; sel().forEach(u=>{const ww=N(u[w]); if(u[k]!=null){n+=Number(u[k])*ww; d+=ww;}}); return d?n/d:null; };
@@ -380,19 +398,6 @@ window.DATA = /*__DATA__*/null;
     document.getElementById('v-unidades').innerHTML=h;
   }
 
-  function renderFase2(){
-    document.getElementById('v-fase2').innerHTML=`
-      <div class="sec">Roadmap — o que entra a seguir</div>
-      <div class="road">
-        <div class="roadcard"><div class="t">CRM 360º por aluno</div><div class="d">Carteira ativa com uso do app, contrato e faixa Engajado/Morno/Em risco, por unidade. Fonte: <code>/clientes/simples</code> + <code>/psec/alunos/alunoApp</code>.</div><div class="badge" style="background:#E7F4EB;color:#3f8a52">✓ no ar (aba CRM 360º)</div></div>
-        <div class="roadcard"><div class="t">Professores 360º</div><div class="d">Ranking de atuação por professor (carteira, fichas em dia/vencidas, % em dia, índice). Fonte: <code>bi-professores-vinculos</code>.</div><div class="badge" style="background:#E7F4EB;color:#3f8a52">✓ no ar</div></div>
-        <div class="roadcard"><div class="t">Nota do treino (NPS)</div><div class="d">Avaliação que os alunos dão ao treino (1–5) e NPS. Endpoint <code>avaliacao-treino</code> retornando 500 — depende de correção na Pacto.</div><div class="badge">bloqueado (Pacto)</div></div>
-        <div class="roadcard"><div class="t">Índice de engajamento</div><div class="d">Score 0–100 por aluno (uso do app, ficha em dia, avaliação, feedback) com faixas Engajado/Morno/Em risco.</div><div class="badge">depende do CRM por aluno</div></div>
-        <div class="roadcard"><div class="t">Corte Público-Alvo</div><div class="d">Fitness/Ambos × Água/Lutas. A modalidade <b>não é exposta pela API</b> (categoria vazio, descricao ausente, /v1/contrato 500) — vem da planilha "Modalidades", como no dashboard de Frequência. Depende de cruzar com essa fonte.</div><div class="badge">pendente (fonte: planilha)</div></div>
-        <div class="roadcard"><div class="t">Séries históricas</div><div class="d">Evolução mês a mês dos indicadores por unidade (acumulando as coletas diárias).</div><div class="badge">acumula com o tempo</div></div>
-      </div>
-      <div class="note">A versão de protótipo (com dados fictícios) mostra como essas telas ficam. Cada item acima é ligado ao vivo conforme destravamos a fonte de dados e a decisão de acesso/PII.</div>`;
-  }
 
   function renderMetodo(){
     document.getElementById('v-metodo').innerHTML=`
@@ -434,6 +439,9 @@ window.DATA = /*__DATA__*/null;
     // separa registros que NÃO são professores (fora do ranking e das médias)
     const pseudo={}; PSEUDO_ORDER.forEach(k=>pseudo[k]={n:0,carteira:0});
     P=P.filter(p=>{const t=NAOPROF(p.nome); if(t){pseudo[t].n++; pseudo[t].carteira+=N(p.carteiraReal); return false;} return true;});
+    const PS=state.profSort;
+    if(PS.k){ const svp=(p,k)=> k==='nome'?String(p.nome||'').toLowerCase() : (k==='unit'?uName(p.unit).toLowerCase() : N(p[k]));
+      P.sort((a,b)=>{const x=svp(a,PS.k),y=svp(b,PS.k); return x<y?-PS.dir:(x>y?PS.dir:0);}); }
     const el=document.getElementById('v-profs');
     if(!P.length){ el.innerHTML='<div class="empty" style="margin-top:20px">Sem professores com vínculo de treino nesta seleção.</div>'; return; }
     const medal=r=>r===0?'🥇':r===1?'🥈':r===2?'🥉':(r+1)+'º';
@@ -446,7 +454,7 @@ window.DATA = /*__DATA__*/null;
       +`<div class="kpi"><div class="n"><span class="dot" style="background:#D64545"></span>Alunos com treino vencido</div><div class="v">${fmt(venc)}</div><div class="s">somados nas carteiras</div></div>`
       +'</div>';
     h+='<div class="sec">Ranking de atuação <span style="font-weight:600;color:var(--muted);font-size:12px">— clique num professor para ver os alunos da carteira</span></div><div class="tbl"><div class="scroll"><table><thead><tr>'
-      +'<th>#</th><th>Professor</th><th>Unidade</th><th>Carteira</th><th>Alunos c/ treino</th><th>Em dia</th><th>Vencidos</th><th>% em dia</th><th>Índice</th></tr></thead><tbody>';
+      +'<th>#</th>'+[['nome','Professor'],['unit','Unidade'],['carteiraReal','Carteira'],['comTreino','Alunos c/ treino'],['emDia','Em dia'],['vencidos','Vencidos'],['pctEmDia','% em dia'],['indice','Índice']].map(c=>`<th class="sortable" data-k="${c[0]}">${c[1]}${_sarr(PS,c[0])}</th>`).join('')+'</tr></thead><tbody>';
     h+=P.map((p,i)=>`<tr class="click" data-pid="${esc(p.id)}"><td style="font-size:15px">${medal(i)}</td><td><div class="aluno-cell">${avatar(p)}<div class="nm">${esc(p.nome)||('Prof '+(p.id||''))}</div></div></td><td>${uName(p.unit)}</td>
       <td><b>${fmt(p.carteiraReal||0)}</b></td><td>${fmt(p.comTreino)}</td><td>${fmt(p.emDia)}</td>
       <td><span class="pill ${N(p.vencidos)>0?'c-red':'c-green'}">${fmt(p.vencidos)}</span></td>
@@ -462,6 +470,7 @@ window.DATA = /*__DATA__*/null;
     }
     el.innerHTML=h;
     el.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>profDrawer(tr.dataset.pid));
+    el.querySelectorAll('th.sortable').forEach(t=>t.onclick=()=>{ const k=t.dataset.k; if(state.profSort.k===k) state.profSort.dir*=-1; else {state.profSort.k=k;state.profSort.dir=1;} renderProfs(); });
   }
   function profDrawer(pid){
     const prof=(D.professores||[]).find(p=>String(p.id)===String(pid))||{};
@@ -517,14 +526,36 @@ window.DATA = /*__DATA__*/null;
   const ELEG = a => /Fitness/i.test(String(a && a.modalidade || ''));
   const crmBaseFull = () => (D.alunos||[]).filter(a=> state.unit==='all' || a.unit===state.unit);
   const crmBase = () => crmBaseFull().filter(ELEG);   // base das métricas do app = público-alvo
+  const contratoBucket = d => d==null? 'vigente' : (d<0?'vencido':(d<=30?'vencendo':'vigente'));
+  const _fld = (label,ctrl) => `<div class="fld"><label>${label}</label>${ctrl}</div>`;
+  const _sel = (id,opts,cur) => `<select class="fsel" data-sel="${id}">`+opts.map(o=>`<option value="${esc(String(o[0]))}" ${String(o[0])===String(cur)?'selected':''}>${esc(o[1])}</option>`).join('')+`</select>`;
+  const _sarr = (st,k) => st.k===k ? `<span class="sar">${st.dir>0?'▲':'▼'}</span>` : '';
+  function sortValAluno(a,k){
+    switch(k){
+      case 'faixa': return ({risco:0,morno:1,engajado:2}[a.faixa]??9);
+      case 'contrato': return (a.diasContrato==null?1e9:a.diasContrato);
+      case 'score': return scoreAluno(a);
+      case 'modalidade': return MOD_ORDER.indexOf(modKey(a));
+      case 'fazTreino': return a.fazTreino===true?1:(a.fazTreino===false?0:-1);
+      case 'usaApp': return a.usaApp===true?1:(a.usaApp===false?0:-1);
+      default: return String(a[k]||'').toLowerCase();
+    }
+  }
   function crmFiltered(){
     let A=crmBase();
-    if(state.crmFaixa!=='all') A=A.filter(a=>a.faixa===state.crmFaixa);
-    if(state.crmPub!=='all')   A=A.filter(a=> state.crmPub==='sim' ? a.fazTreino===true : a.fazTreino===false);
-    if(state.crmMod!=='all')   A=A.filter(a=> modKey(a)===state.crmMod);
+    if(state.crmFaixa!=='all')    A=A.filter(a=>a.faixa===state.crmFaixa);
+    if(state.crmPub!=='all')      A=A.filter(a=> state.crmPub==='sim' ? a.fazTreino===true : a.fazTreino===false);
+    if(state.crmMod!=='all')      A=A.filter(a=> modKey(a)===state.crmMod);
+    if(state.crmProf!=='all')     A=A.filter(a=> String(a.professor||'—')===state.crmProf);
+    if(state.crmContrato!=='all') A=A.filter(a=> contratoBucket(a.diasContrato)===state.crmContrato);
     const qq=(state.crmQ||'').trim().toLowerCase();
-    if(qq) A=A.filter(a=>String(a.nome||'').toLowerCase().includes(qq));
-    A.sort((a,b)=>{const o={risco:0,morno:1,engajado:2}; if(o[a.faixa]!==o[b.faixa]) return o[a.faixa]-o[b.faixa]; return (a.diasContrato??1e9)-(b.diasContrato??1e9);});
+    if(qq) A=A.filter(a=>String(a.nome||'').toLowerCase().includes(qq)||String(a.email||'').toLowerCase().includes(qq));
+    if(state.crmSort.k){
+      const k=state.crmSort.k, dir=state.crmSort.dir;
+      A.sort((a,b)=>{const x=sortValAluno(a,k),y=sortValAluno(b,k); return x<y?-dir:(x>y?dir:0);});
+    } else {
+      A.sort((a,b)=>{const o={risco:0,morno:1,engajado:2}; if(o[a.faixa]!==o[b.faixa]) return o[a.faixa]-o[b.faixa]; return (a.diasContrato??1e9)-(b.diasContrato??1e9);});
+    }
     return A;
   }
   const PER=40;
@@ -534,20 +565,23 @@ window.DATA = /*__DATA__*/null;
     if(state.crmPage>pages) state.crmPage=pages; if(state.crmPage<1) state.crmPage=1;
     const start=(state.crmPage-1)*PER, rows=A.slice(start,start+PER);
     const showUnit = state.unit==='all';
-    let h='<div class="tbl"><div class="scroll"><table><thead><tr><th>Aluno</th>'
-      +(showUnit?'<th>Unidade</th>':'')+'<th>Professor</th><th>Modalidade</th><th>Faz treino</th><th>Usa o app</th><th>Contrato</th><th>Faixa</th><th>Score</th></tr></thead><tbody>';
+    const S=state.crmSort, TH=(k,l)=>`<th class="sortable" data-k="${k}">${l}${_sarr(S,k)}</th>`;
+    let h='<div class="tbl rtable"><div class="scroll"><table><thead><tr>'
+      +TH('nome','Aluno')+(showUnit?TH('unitNome','Unidade'):'')+TH('professor','Professor')+TH('modalidade','Modalidade')+TH('fazTreino','Faz treino')+TH('usaApp','Usa o app')+TH('contrato','Contrato')+TH('faixa','Faixa')+TH('score','Score')
+      +'</tr></thead><tbody>';
     if(!rows.length){ h+=`<tr><td colspan="${showUnit?9:8}"><div class="empty" style="border:none;padding:26px">Nenhum aluno para estes filtros. Tente ampliar a seleção.</div></td></tr>`; }
     rows.forEach(a=>{ const f=FA[a.faixa]||['—','']; h+=`<tr>
-      <td><div class="aluno-cell">${avatar(a)}<div><div class="nm">${esc(a.nome)||'—'}</div><div class="ct">${esc(a.email||'')}${a.telefone?(a.email?' · ':'')+esc(a.telefone):''}</div></div></div></td>`
-      +(showUnit?`<td>${esc(a.unitNome)}</td>`:'')
-      +`<td class="muted">${esc(a.professor)||'—'}</td><td>${modPill(a.modalidade)}</td><td>${fazPill(a.fazTreino)}</td><td>${appPill(a.usaApp)}</td><td>${contratoPill(a.diasContrato)}</td>
-      <td><span class="pill ${f[1]}">${f[0]}</span></td><td>${scorePill(scoreAluno(a))}</td></tr>`; });
+      <td data-label="Aluno"><div class="aluno-cell">${avatar(a)}<div><div class="nm">${esc(a.nome)||'—'}</div><div class="ct">${esc(a.email||'')}${a.telefone?(a.email?' · ':'')+esc(a.telefone):''}</div></div></div></td>`
+      +(showUnit?`<td data-label="Unidade">${esc(a.unitNome)}</td>`:'')
+      +`<td class="muted" data-label="Professor">${esc(a.professor)||'—'}</td><td data-label="Modalidade">${modPill(a.modalidade)}</td><td data-label="Faz treino">${fazPill(a.fazTreino)}</td><td data-label="Usa o app">${appPill(a.usaApp)}</td><td data-label="Contrato">${contratoPill(a.diasContrato)}</td>
+      <td data-label="Faixa"><span class="pill ${f[1]}">${f[0]}</span></td><td data-label="Score">${scorePill(scoreAluno(a))}</td></tr>`; });
     h+='</tbody></table></div>';
     h+=`<div class="pager"><span style="color:var(--muted);font-size:12.5px">${fmt(A.length)} aluno(s) · página ${state.crmPage} de ${pages}</span>
       <span style="display:flex;gap:8px"><button class="pbtn" data-p="prev" ${state.crmPage<=1?'disabled':''}>‹ Anterior</button>
       <button class="pbtn" data-p="next" ${state.crmPage>=pages?'disabled':''}>Próxima ›</button></span></div></div>`;
     box.innerHTML=h;
     box.querySelectorAll('.pbtn').forEach(b=>b.onclick=()=>{ state.crmPage+=(b.dataset.p==='next'?1:-1); renderCRMResults(); window.scrollTo({top:0,behavior:'smooth'}); });
+    box.querySelectorAll('th.sortable').forEach(t=>t.onclick=()=>{ const k=t.dataset.k; if(state.crmSort.k===k) state.crmSort.dir*=-1; else {state.crmSort.k=k;state.crmSort.dir=1;} state.crmPage=1; renderCRMResults(); });
   }
   function renderCRM(){
     const el=document.getElementById('v-crm');
@@ -574,24 +608,25 @@ window.DATA = /*__DATA__*/null;
     // distribuição por modalidade (público-alvo)
     h+='<div style="margin-top:14px">'+modPanel(B)
       +`<p class="sub" style="margin:8px 2px 0">Base = <b>público-alvo do App Treino</b> (planos com Fitness). Fora: <b>${fmt(fora)}</b> alunos (Água/Luta só, Outros) — não entram nas métricas de uso do app.</p></div>`;
-    // filtro modalidade
-    const modChips=[['all','Todas']].concat(MOD_ORDER.filter(k=>B.some(a=>modKey(a)===k)).map(k=>[k,MOD_LABEL[k]]));
-    h+='<div class="subf"><span class="flab">Modalidade</span>'+modChips.map(m=>`<button class="chip cm ${state.crmMod===m[0]?'on':''}" data-m="${esc(m[0])}">${m[1]}</button>`).join('')+'</div>';
-    // filtro faixa
-    const faixas=[['all','Todos'],['engajado','Engajado'],['morno','Morno'],['risco','Em risco']];
-    h+='<div class="subf"><span class="flab">Faixa</span>'+faixas.map(f=>`<button class="chip cf ${state.crmFaixa===f[0]?'on':''}" data-f="${f[0]}">${f[1]}</button>`).join('')+'</div>';
-    // filtro faz treino (elegivel ao App Treino = vinculado a um professor de treino)
-    const fchips=[['all','Todos'],['sim','Faz treino'],['nao','Não faz']];
-    h+='<div class="subf"><span class="flab">Faz treino</span>'
-      +fchips.map(p=>`<button class="chip cp ${state.crmPub===p[0]?'on':''}" data-p="${p[0]}">${p[1]}</button>`).join('')+'</div>';
-    // busca
-    h+='<div class="subf"><span class="flab">Buscar</span><input class="srch" id="crmSearch" type="text" placeholder="nome do aluno…" value="'+esc(state.crmQ||'')+'"></div>';
-    h+='<div id="crmResults" style="margin-top:12px"></div>';
+    // ---- Barra de filtros (limpa e hierárquica) ----
+    const profOpts=[['all','Todos os professores']].concat([...new Set(Bf.map(a=>String(a.professor||'—')))].filter(Boolean).sort((x,y)=>x.localeCompare(y,'pt')).map(p=>[p,p]));
+    const unitOpts=[['all','Todas as unidades']].concat(ALL.map(u=>[u.id,u.nome]));
+    const modOpts=[['all','Todas as modalidades']].concat(MOD_ORDER.filter(k=>B.some(a=>modKey(a)===k)).map(k=>[k,MOD_LABEL[k]]));
+    h+='<div class="filterbar">'
+      +_fld('Buscar','<input class="finp" id="crmSearch" type="text" placeholder="nome ou e-mail…" value="'+esc(state.crmQ||'')+'">')
+      +_fld('Professor',_sel('crmProf',profOpts,state.crmProf))
+      +_fld('Unidade',_sel('crmUnitSel',unitOpts,state.unit))
+      +_fld('Contrato',_sel('crmContrato',[['all','Todos'],['vigente','Vigente'],['vencendo','Vence ≤30d'],['vencido','Vencido']],state.crmContrato))
+      +_fld('Modalidade',_sel('crmMod',modOpts,state.crmMod))
+      +_fld('Faixa',_sel('crmFaixa',[['all','Todas'],['engajado','Engajado'],['morno','Morno'],['risco','Em risco']],state.crmFaixa))
+      +_fld('Faz treino',_sel('crmPub',[['all','Todos'],['sim','Faz treino'],['nao','Não faz']],state.crmPub))
+      +'</div><p class="sub" style="margin:0 2px 4px">Clique no cabeçalho de qualquer coluna para ordenar.</p>';
+    h+='<div id="crmResults" style="margin-top:8px"></div>';
     h+='<div class="note"><b>Como lemos a faixa (dados reais disponíveis):</b> <b>Engajado</b> = usa o App Treino e contrato vigente; <b>Morno</b> = usa o app mas contrato a vencer, ou não usa mas contrato ok; <b>Em risco</b> = não usa o app e contrato vencendo/vencido. Base desta aba: <b>público-alvo do App Treino</b> = ativos (situação = ATIVO) com <b>plano de Fitness</b> (via <code>/clientes/simples</code> + modalidade do contrato); uso do app via <code>/psec/alunos/alunoApp</code>. <b>Faz treino</b> = aluno vinculado a um <b>professor de treino</b> (via <code>/v1/cliente.vinculos</code> cruzado com <code>bi-professores-vinculos</code>) — é o corte de elegibilidade ao App Treino. <b>Modalidade</b> (Fitness/Água/Luta/Ambos, 7 baldes) vem da descrição do plano em <code>/v1/contrato/matricula/{matricula}</code>. O "treino em dia" por aluno ainda depende de endpoint indisponível.</div>';
     el.innerHTML=h;
-    el.querySelectorAll('.chip.cf').forEach(b=>b.onclick=()=>{ state.crmFaixa=b.dataset.f; state.crmPage=1; renderCRM(); });
-    el.querySelectorAll('.chip.cp').forEach(b=>b.onclick=()=>{ state.crmPub=b.dataset.p; state.crmPage=1; renderCRM(); });
-    el.querySelectorAll('.chip.cm').forEach(b=>b.onclick=()=>{ state.crmMod=b.dataset.m; state.crmPage=1; renderCRM(); });
+    el.querySelectorAll('.fsel').forEach(s=>s.onchange=()=>{ const id=s.dataset.sel, v=s.value;
+      if(id==='crmUnitSel'){ state.unit=v; state.crmPage=1; renderChips(); renderGeral(); renderProfs(); renderCRM(); renderScore(); return; }
+      state[id]=v; state.crmPage=1; renderCRM(); });
     const sb=document.getElementById('crmSearch');
     if(sb){ sb.oninput=()=>{ state.crmQ=sb.value; state.crmPage=1; renderCRMResults(); }; }
     renderCRMResults();
@@ -625,9 +660,19 @@ window.DATA = /*__DATA__*/null;
   }
   function scoreFila(){
     let f=crmBase().map(a=>({a,ini:iniDe(a),sc:scoreAluno(a)})).filter(x=>x.ini);
-    if(state.scoreIni!=='all') f=f.filter(x=>x.ini===state.scoreIni);
-    const ord={reativar:0,retencao:1,instalar:2,renovar:3};
-    f.sort((x,y)=> (x.sc-y.sc) || (ord[x.ini]-ord[y.ini]));
+    if(state.scoreIni!=='all')      f=f.filter(x=>x.ini===state.scoreIni);
+    if(state.scoreProf!=='all')     f=f.filter(x=>String(x.a.professor||'—')===state.scoreProf);
+    if(state.scoreContrato!=='all') f=f.filter(x=>contratoBucket(x.a.diasContrato)===state.scoreContrato);
+    const qq=(state.scoreQ||'').trim().toLowerCase();
+    if(qq) f=f.filter(x=>String(x.a.nome||'').toLowerCase().includes(qq)||String(x.a.email||'').toLowerCase().includes(qq));
+    if(state.scoreSort.k){
+      const k=state.scoreSort.k, dir=state.scoreSort.dir;
+      const sv=x=> k==='score'?x.sc : (k==='motivo'?x.ini : String((k==='nome'?x.a.nome:(k==='unitNome'?x.a.unitNome:x.a.professor))||'').toLowerCase());
+      f.sort((a,b)=>{const p=sv(a),q=sv(b); return p<q?-dir:(p>q?dir:0);});
+    } else {
+      const ord={reativar:0,retencao:1,instalar:2,renovar:3};
+      f.sort((x,y)=> (x.sc-y.sc) || (ord[x.ini]-ord[y.ini]));
+    }
     return f;
   }
   function renderScoreResults(){
@@ -636,22 +681,24 @@ window.DATA = /*__DATA__*/null;
     if(state.scorePage>pages) state.scorePage=pages; if(state.scorePage<1) state.scorePage=1;
     const start=(state.scorePage-1)*PER, rows=F.slice(start,start+PER);
     const showUnit=state.unit==='all';
-    let h='<div class="tbl"><div class="scroll"><table><thead><tr><th>Aluno</th>'
-      +(showUnit?'<th>Unidade</th>':'')+'<th>Professor</th><th>Motivo</th><th>Ação sugerida</th><th>Score</th></tr></thead><tbody>';
+    const SS=state.scoreSort, STH=(k,l)=>`<th class="sortable" data-k="${k}">${l}${_sarr(SS,k)}</th>`;
+    let h='<div class="tbl rtable"><div class="scroll"><table><thead><tr>'
+      +STH('nome','Aluno')+(showUnit?STH('unitNome','Unidade'):'')+STH('professor','Professor')+STH('motivo','Motivo')+'<th>Ação sugerida</th>'+STH('score','Score')+'</tr></thead><tbody>';
     if(!rows.length){ h+=`<tr><td colspan="${showUnit?6:5}"><div class="empty" style="border:none;padding:26px">Sem alunos nesta iniciativa. 🎉</div></td></tr>`; }
     rows.forEach(x=>{ const a=x.a, I=INIS[x.ini]; h+=`<tr>
-      <td><div class="aluno-cell">${avatar(a)}<div><div class="nm">${esc(a.nome)||'—'}</div><div class="ct">${esc(a.email||'')}</div></div></div></td>`
-      +(showUnit?`<td class="muted">${esc(a.unitNome)}</td>`:'')
-      +`<td class="muted">${esc(a.professor)||'—'}</td>
-      <td><span class="pill" style="background:#F1F0EC;color:${I.c}">${I.t}</span></td>
-      <td style="font-size:12.5px;color:#5a5a5a">${I.ac}</td>
-      <td>${scorePill(x.sc)}</td></tr>`; });
+      <td data-label="Aluno"><div class="aluno-cell">${avatar(a)}<div><div class="nm">${esc(a.nome)||'—'}</div><div class="ct">${esc(a.email||'')}</div></div></div></td>`
+      +(showUnit?`<td class="muted" data-label="Unidade">${esc(a.unitNome)}</td>`:'')
+      +`<td class="muted" data-label="Professor">${esc(a.professor)||'—'}</td>
+      <td data-label="Motivo"><span class="pill" style="background:#F1F0EC;color:${I.c}">${I.t}</span></td>
+      <td data-label="Ação" style="font-size:12.5px;color:var(--muted)">${I.ac}</td>
+      <td data-label="Score">${scorePill(x.sc)}</td></tr>`; });
     h+='</tbody></table></div>';
     h+=`<div class="pager"><span style="color:var(--muted);font-size:12.5px">${fmt(F.length)} aluno(s) na fila · página ${state.scorePage} de ${pages}</span>
       <span style="display:flex;gap:8px"><button class="pbtn" data-p="prev" ${state.scorePage<=1?'disabled':''}>‹ Anterior</button>
       <button class="pbtn" data-p="next" ${state.scorePage>=pages?'disabled':''}>Próxima ›</button></span></div></div>`;
     box.innerHTML=h;
     box.querySelectorAll('.pbtn').forEach(b=>b.onclick=()=>{ state.scorePage+=(b.dataset.p==='next'?1:-1); renderScoreResults(); window.scrollTo({top:0,behavior:'smooth'}); });
+    box.querySelectorAll('th.sortable').forEach(t=>t.onclick=()=>{ const k=t.dataset.k; if(state.scoreSort.k===k) state.scoreSort.dir*=-1; else {state.scoreSort.k=k;state.scoreSort.dir=1;} state.scorePage=1; renderScoreResults(); });
   }
   function renderScore(){
     const el=document.getElementById('v-score');
@@ -661,11 +708,11 @@ window.DATA = /*__DATA__*/null;
     const cnt={}; Object.keys(INIS).forEach(k=>cnt[k]=0); fila.forEach(x=>cnt[x.ini]++);
     const avg=Math.round(B.reduce((s,a)=>s+scoreAluno(a),0)/(B.length||1));
     const vol=[
-      {t:'Não usam o App Treino',         n:B.filter(a=>a.usaApp===false).length,        ac:'Campanha de instalação/onboarding do app', c:'#7A5AA8'},
-      {t:'Não fazem treino (sem vínculo)',n:B.filter(a=>a.fazTreino===false).length,      ac:'Encaminhar para prescrição com professor',  c:'#0EA5A0'},
-      {t:'Contrato vencido',              n:B.filter(a=>a.diasContrato!=null&&a.diasContrato<0).length, ac:'Reativação / renovação', c:'#D64545'},
-      {t:'Alunos em risco',               n:B.filter(a=>a.faixa==='risco').length,        ac:'Contato de retenção',                       c:'#D64545'},
-      {t:'Contrato vence em ≤30d',        n:B.filter(a=>a.diasContrato!=null&&a.diasContrato>=0&&a.diasContrato<=30).length, ac:'Renovação antecipada', c:'#F2C94C'},
+      {t:'Não usam o App Treino',         n:B.filter(a=>a.usaApp===false).length,        crit:'aptos com "usa o app" = Não', ac:'campanha de instalação/onboarding', c:'#7A5AA8'},
+      {t:'Não fazem treino (sem vínculo)',n:B.filter(a=>a.fazTreino===false).length,      crit:'aptos sem vínculo com professor de treino', ac:'encaminhar p/ prescrição', c:'#0EA5A0'},
+      {t:'Contrato vencido',              n:B.filter(a=>a.diasContrato!=null&&a.diasContrato<0).length, crit:'contrato com dias < 0', ac:'reativação / renovação', c:'#D64545'},
+      {t:'Alunos em risco',               n:B.filter(a=>a.faixa==='risco').length,        crit:'não usam o app + contrato vencendo/vencido', ac:'contato de retenção', c:'#D64545'},
+      {t:'Contrato vence em ≤30d',        n:B.filter(a=>a.diasContrato!=null&&a.diasContrato>=0&&a.diasContrato<=30).length, crit:'contrato entre 0 e 30 dias', ac:'renovação antecipada', c:'#F2C94C'},
     ].sort((x,y)=>y.n-x.n);
     const maxVol=Math.max(1,...vol.map(v=>v.n));
     let h='<div class="sec">Score &amp; Ações — '+(state.unit==='all'?'rede':uName(state.unit))+'</div>';
@@ -677,17 +724,29 @@ window.DATA = /*__DATA__*/null;
       +'</div>';
     h+='<div class="panel" style="margin-top:16px"><h3>Ações priorizadas por volume</h3><p class="sub">o que dá mais resultado primeiro — nº de alunos impactados na seleção</p>';
     h+=vol.map(v=>`<div style="display:flex;align-items:center;gap:12px;margin:11px 0">
-      <div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">${v.t}</div><div style="color:var(--muted);font-size:11.5px">${v.ac}</div></div>
-      <div class="bar" style="max-width:340px"><i style="width:${v.n/maxVol*100}%;background:${v.c}"></i></div>
+      <div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">${v.t} <span style="color:var(--muted);font-weight:400;font-size:11px">— ${v.ac}</span></div><div style="color:var(--muted);font-size:11px">critério: ${v.crit}</div></div>
+      <div class="bar" style="max-width:320px"><i style="width:${v.n/maxVol*100}%;background:${v.c}"></i></div>
       <div style="font-weight:800;font-size:15px;min-width:64px;text-align:right">${fmt(v.n)}</div></div>`).join('');
     h+='</div>';
-    const chips=[['all','Todas']].concat(Object.keys(INIS).map(k=>[k,INIS[k].t]));
+    const profOpts=[['all','Todos os professores']].concat([...new Set(B.map(a=>String(a.professor||'—')))].filter(Boolean).sort((x,y)=>x.localeCompare(y,'pt')).map(p=>[p,p]));
+    const unitOpts=[['all','Todas as unidades']].concat(ALL.map(u=>[u.id,u.nome]));
+    const iniOpts=[['all','Todas as iniciativas']].concat(Object.keys(INIS).map(k=>[k,INIS[k].t]));
     h+='<div class="sec">Fila de iniciativas</div>';
-    h+='<div class="subf"><span class="flab">Iniciativa</span>'+chips.map(c=>`<button class="chip si ${state.scoreIni===c[0]?'on':''}" data-i="${c[0]}">${c[1]}</button>`).join('')+'</div>';
-    h+='<div id="scoreResults" style="margin-top:12px"></div>';
-    h+='<div class="note"><b>Score 0–100</b> = uso do app (40) + faz treino/vínculo (30) + saúde do contrato (30). A <b>fila</b> classifica cada aluno pela ação mais urgente (contrato vencido → retenção → instalar app → renovar) e ordena do menor score para o maior. Página com login — por isso exibe nomes/contatos.</div>';
+    h+='<div class="filterbar">'
+      +_fld('Buscar','<input class="finp" id="scoreSearch" type="text" placeholder="nome ou e-mail…" value="'+esc(state.scoreQ||'')+'">')
+      +_fld('Unidade',_sel('scoreUnitSel',unitOpts,state.unit))
+      +_fld('Professor',_sel('scoreProf',profOpts,state.scoreProf))
+      +_fld('Contrato',_sel('scoreContrato',[['all','Todos'],['vigente','Vigente'],['vencendo','Vence ≤30d'],['vencido','Vencido']],state.scoreContrato))
+      +_fld('Iniciativa',_sel('scoreIni',iniOpts,state.scoreIni))
+      +'</div><p class="sub" style="margin:0 2px 4px">Clique no cabeçalho de qualquer coluna para ordenar.</p>';
+    h+='<div id="scoreResults" style="margin-top:8px"></div>';
+    h+='<div class="note"><b>Como a fila é montada:</b> cada aluno cai na <b>ação mais urgente</b> — <b>Reativar contrato</b> (contrato vencido) → <b>Retenção</b> (em risco e não usa o app) → <b>Instalar o App</b> (faz treino mas não usa o app) → <b>Renovação antecipada</b> (contrato vence em ≤30d) — ordenada do menor score para o maior. <b>Score 0–100</b> = uso do app (40) + faz treino/vínculo (30) + saúde do contrato (30). Página com login — por isso exibe nomes/contatos.</div>';
     el.innerHTML=h;
-    el.querySelectorAll('.chip.si').forEach(b=>b.onclick=()=>{ state.scoreIni=b.dataset.i; state.scorePage=1; renderScore(); });
+    el.querySelectorAll('.fsel').forEach(s=>s.onchange=()=>{ const id=s.dataset.sel, v=s.value;
+      if(id==='scoreUnitSel'){ state.unit=v; state.scorePage=1; renderChips(); renderGeral(); renderProfs(); renderCRM(); renderScore(); return; }
+      state[id]=v; state.scorePage=1; renderScore(); });
+    const ssb=document.getElementById('scoreSearch');
+    if(ssb){ ssb.oninput=()=>{ state.scoreQ=ssb.value; state.scorePage=1; renderScoreResults(); }; }
     renderScoreResults();
   }
 
