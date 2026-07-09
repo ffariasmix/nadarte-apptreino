@@ -356,7 +356,7 @@ def treino_status_map(key):
     out = {}
     for ep, status in (("alunos-treino-em-dia", "emdia"), ("alunos-treino-vencido", "vencido")):
         seen = -1
-        for page in range(1, 21):  # teto: 20 x 1000 = 20k por status/unidade
+        for page in range(0, 20):  # 0-INDEXED (confirmado): comeca na pagina 0
             lst = content(key, "/psec/treino-bi/%s/0?page=%d&size=1000" % (ep, page))
             items = lst if isinstance(lst, list) else (lst.get("content") if isinstance(lst, dict) else None)
             if not items:
