@@ -349,21 +349,21 @@
   "data": "2026-07-09",
   "rede": {
    "usoApp": 41.2,
-   "emDiaPct": 63.7,
-   "vencidos": 872,
+   "emDiaPct": 63.9,
+   "vencidos": 868,
    "avalVencidas": 504,
    "nota": 4.93,
-   "execSemana": 2570,
-   "ativos": 5009,
-   "engajado": 1112,
-   "morno": 3476,
-   "risco": 421,
+   "execSemana": 2571,
+   "ativos": 5023,
+   "engajado": 1114,
+   "morno": 3486,
+   "risco": 423,
    "semdado": 0,
-   "appSim": 1215,
-   "appNao": 3794,
+   "appSim": 1217,
+   "appNao": 3806,
    "appFalha": 0,
-   "fazTreino": 3405,
-   "naoFazTreino": 1448
+   "fazTreino": 3277,
+   "naoFazTreino": 1408
   },
   "unidades": [
    {
@@ -377,7 +377,7 @@
     "id": "716Norte",
     "nome": "716 Norte",
     "usoApp": 67.2,
-    "emDiaPct": 54.0,
+    "emDiaPct": 55.0,
     "nota": 4.92
    },
    {
