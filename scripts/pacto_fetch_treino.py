@@ -338,8 +338,19 @@ def prof_treino(key, cid, treino_codes):
         return (None, None, None, None)
 
 # ---------------------------------------------------------------- por unidade
+def normmat(m):
+    """Chave canonica de matricula: remove zeros a esquerda / normaliza int-vs-str.
+    Ex.: '019613' e 19613 viram ambos '19613' (evita mismatch no cruzamento)."""
+    if m is None:
+        return None
+    try:
+        return str(int(str(m).strip()))
+    except Exception:
+        return str(m).strip()
+
+
 def treino_status_map(key):
-    """matricula -> 'emdia' | 'vencido' cruzando as listas por-aluno (cp=0 = unidade toda).
+    """matricula(normalizada) -> 'emdia' | 'vencido' cruzando as listas por-aluno (cp=0 = unidade toda).
     Endpoints confirmados por probe: /psec/treino-bi/alunos-treino-{em-dia,vencido}/{cp}.
     So usamos matricula (sem PII). Paginacao com trava anti-loop."""
     out = {}
@@ -351,9 +362,9 @@ def treino_status_map(key):
             if not items:
                 break
             for it in items:
-                m = it.get("matricula")
+                m = normmat(it.get("matricula"))
                 if m is not None:
-                    out[str(m)] = status
+                    out[m] = status
             if len(items) < 1000 or len(out) == seen:  # ultima pagina OU pagina nao avancou
                 break
             seen = len(out)
@@ -586,7 +597,7 @@ def main():
             ua, faz, pnome, pcod, foto, modal = app_res.get((uk, cid), (None, None, None, None, None, None))
             faixa = classifica(bool(ua), fim_ms) if ua is not None else "semdado"
             _mat = it.get("matricula")
-            treino_st = tstat.get(str(_mat)) if _mat is not None else None
+            treino_st = tstat.get(normmat(_mat)) if _mat is not None else None
             u_alunos.append({
                 "unit": uk, "unitNome": r["ulabel"],
                 "nome": it.get("nome"), "matricula": it.get("matricula"),
