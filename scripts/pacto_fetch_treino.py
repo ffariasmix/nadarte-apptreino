@@ -510,6 +510,7 @@ def coleta_unidade(uk, ulabel, key):
         "avaliacoesReavaliacoes": num(avf, "reavaliacoes"),
         "avaliacoesPrevistas": num(avf, "previstas"),
         "avaliacoesSem": num(avf, "semAvaliacao"),
+        "avaliacoesBase": num(avf, "avaliacoes"),   # total do modulo (com + sem) = denominador do % c/ aval.
         # ---- Nota do treino (estrelas) — KPI7 ----
         "nr1estrelas": _estr[1], "nr2estrelas": _estr[2], "nr3estrelas": _estr[3],
         "nr4estrelas": _estr[4], "nr5estrelas": _estr[5],

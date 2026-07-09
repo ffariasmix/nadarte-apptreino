@@ -396,11 +396,11 @@ window.DATA = /*__DATA__*/null;
     const alvoStats=uid=>{ const base=(D.alunos||[]).filter(a=>a.unit===uid&&ELEG(a));
       const alvo=base.length, comT=base.filter(a=>a.treinoStatus!=null).length;
       return {alvo, comT, pctT: alvo? comT/alvo*100 : null}; };
-    // % c/ avaliação — UNIDADE inteira (todos os ativos): (ativos − sem avaliação) / ativos.
+    // % c/ avaliação — UNIDADE inteira: (base − sem) / base, onde base = total do módulo de avaliação.
+    // Denominador correto é avaliacoesBase (com+sem); totalAlunosAtivos é outra base e daria negativo.
     // A Pacto não expõe avaliação por aluno, então este % NÃO é recortado pelo público-alvo.
-    const avalCov=u=>{ const ativos=N(u.totalAlunosAtivos), sem=N(u.avaliacoesSem);
-      const temDado=(N(u.avaliacoesRealizadas)+N(u.avaliacoesAtrasadas)+sem)>0;
-      return (ativos>0 && temDado) ? (ativos-sem)/ativos*100 : null; };
+    const avalCov=u=>{ const base=N(u.avaliacoesBase), sem=N(u.avaliacoesSem);
+      return base>0 ? Math.max(0, Math.min(100, (base-sem)/base*100)) : null; };
     const cols=[['Unidade',''],['Público-alvo','Fitness'],['% c/ treino','público-alvo'],['Uso app','público-alvo'],['Em dia',''],['Vencidos',''],['Aval. feitas',''],['Aval. vencidas',''],['% c/ aval.','todos os ativos'],['Acompanh.','']];
     h+='<div class="sec">Tabela comparativa</div><p class="sub" style="margin:-4px 2px 8px"><b>% c/ treino</b> e <b>Uso app</b> são sobre o <b>público-alvo</b> (ativos com plano de Fitness). <b>% c/ aval.</b> é sobre <b>todos os ativos</b> da unidade — a Pacto não expõe avaliação por aluno, então não dá pra recortar por Fitness.</p><div class="tbl"><div class="scroll"><table><thead><tr>'+cols.map(c=>`<th style="white-space:nowrap">${c[0]}${c[1]?`<div style="font-weight:500;font-size:9.5px;color:var(--muted);text-transform:none;letter-spacing:0">${c[1]}</div>`:''}</th>`).join('')+'</tr></thead><tbody>';
     h+=ALL.map(u=>{ const s=alvoStats(u.id); const av=avalCov(u); return `<tr><td style="white-space:nowrap"><b>${u.nome}</b></td>
@@ -437,7 +437,7 @@ window.DATA = /*__DATA__*/null;
           <tr><td><b>Modalidade (7 baldes)</b></td><td><code>/v1/contrato/matricula/{matrícula}.descricao</code> → classificador</td></tr>
           <tr><td><b>Foto do aluno / professor</b></td><td><code>/v1/cliente.pessoa.fotoUrl</code> · <code>bi-professores-vinculos.imageUri</code></td></tr>
           <tr><td><b>Motivo "Sem Professor"</b></td><td><code>/clientes/{matrícula}/dados-pessoais.objecao</code> (registrado pela equipe)</td></tr>
-          <tr><td><b>% c/ avaliação (unidade)</b></td><td><code>avaliacao-fisica-bi.semAvaliacao</code> → (ativos − sem) ÷ ativos · <b>unidade inteira</b></td></tr>
+          <tr><td><b>% c/ avaliação (unidade)</b></td><td><code>avaliacao-fisica-bi</code>: (avaliacoes − semAvaliacao) ÷ avaliacoes · <b>unidade inteira</b></td></tr>
         </tbody></table></div>
         <div class="note"><b>Depende de processo (lado Pacto), não de código:</b> <b>Atendimento</b> só sobe quando os professores registram o acompanhamento; <b>Motivo "Sem Professor"</b> só aparece quando a equipe preenche o campo <code>objecao</code>; <b>Nota por professor</b> só existe para quem tem avaliações no app.</div>
         <div class="note"><b>Avaliação por aluno:</b> a Pacto expõe avaliação apenas como <b>total da unidade</b> (contagens em <code>avaliacao-fisica-bi</code>); os endpoints por aluno (<code>/psec/alunos/avaliacao*</code>) existem mas exigem parâmetros não documentados. Por isso <b>% c/ treino</b> é sobre o público-alvo (Fitness, por aluno) e <b>% c/ avaliação</b> é sobre todos os ativos da unidade.</div>
