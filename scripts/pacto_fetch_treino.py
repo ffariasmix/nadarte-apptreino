@@ -371,6 +371,26 @@ def treino_status_map(key):
     return out
 
 
+def semprof(nome):
+    """True se o 'professor' do aluno e, na verdade, um marcador de SEM PROFESSOR
+    (espelha o NAOPROF->'Sem Professor' do front: nao quer / sem professor / so natacao)."""
+    if not nome:
+        return False
+    u = " " + strip_accents(str(nome)).upper() + " "
+    return bool(re.search(r"NAO QUER PROFESSOR|SEM PROFESSOR|SOMENTE NATACAO", u))
+
+
+def cliente_objecao(key, mat):
+    """Motivo 'Sem Professor' registrado pela equipe no Pacto: /clientes/{mat}/dados-pessoais.objecao.
+    Confirmado por probe v30. Retorna texto ou None (vazio = ainda nao registrado)."""
+    d = content(key, "/clientes/%s/dados-pessoais" % mat)
+    if isinstance(d, dict):
+        v = d.get("objecao")
+        v = str(v).strip() if v is not None else ""
+        return v or None
+    return None
+
+
 def prof_nota(key, pid):
     """Nota (estrelas) + treino em dia POR PROFESSOR via dados?idProfessor={pid}. Confirmado por probe."""
     d = content(key, "/psec/treino-bi/dados?idProfessor=%s" % pid)
@@ -535,6 +555,7 @@ def main():
             mat = it.get("matricula") or cid
             tarefas.append((uk, key, cid, mat))
     app_res = {}  # (uk, cid) -> (usaApp, fazTreino, profNome, profId, foto, modalidade)
+    motivo_res = {}  # (uk, cid) -> motivo 'Sem Professor' (objecao)
     n_true = n_false = n_fail = n_treino = 0
     modal_cache = load_modal_cache()   # cache versionado (matricula hasheada -> {m, d})
     HOJE = datetime.date.today().isoformat()
@@ -555,10 +576,13 @@ def main():
                     modal, src = ce.get("m"), "stale"
                 else:
                     src = "fetch"
-            return (uk, cid, ua, faz, pnome, pcod, foto, modal, mat, src)
+            motivo = cliente_objecao(key, mat) if semprof(pnome) else None  # so p/ 'Sem Professor'
+            return (uk, cid, ua, faz, pnome, pcod, foto, modal, mat, src, motivo)
         with ThreadPoolExecutor(max_workers=6) as ex:          # <= gentil com a API (ate 3 chamadas/aluno)
-            for uk, cid, ua, faz, pnome, pcod, foto, modal, mat, src in ex.map(_one, tarefas):
+            for uk, cid, ua, faz, pnome, pcod, foto, modal, mat, src, motivo in ex.map(_one, tarefas):
                 app_res[(uk, cid)] = (ua, faz, pnome, pcod, foto, modal)
+                if motivo:
+                    motivo_res[(uk, cid)] = motivo
                 src_cnt[src] = src_cnt.get(src, 0) + 1
                 h = _mhash(mat)
                 if src == "fetch" and modal is not None:
@@ -582,6 +606,7 @@ def main():
             n_treino += 1 if faz is True else 0
         print("[app] usaApp -> sim %d | nao %d | falha %d | fazTreino %d (de %d ativos)"
               % (n_true, n_false, n_fail, n_treino, len(tarefas)), file=sys.stderr)
+        print("[objecao] motivos 'Sem Professor' registrados: %d" % len(motivo_res), file=sys.stderr)
         save_modal_cache(new_cache)
         print("[modalidade] cache -> %d hit | %d fetch | %d stale | %d entradas salvas (TTL %dd)"
               % (src_cnt["cache"], src_cnt["fetch"], src_cnt["stale"], len(new_cache), MODAL_TTL), file=sys.stderr)
@@ -604,6 +629,7 @@ def main():
                 "foto": foto,   # pessoa.fotoUrl (via /v1/cliente)
                 "modalidade": modal,   # 7 baldes (via /v1/contrato/matricula)
                 "treinoStatus": treino_st,   # 'emdia' | 'vencido' | None (via listas por-aluno)
+                "motivoSemProf": motivo_res.get((uk, cid)),   # objecao (Bloco 02), so p/ 'Sem Professor'
                 "fazTreino": faz, "professor": pnome, "professorId": pcod,
                 "elegivel": faz,   # elegivel ao App Treino = faz treino (vinculo com prof. de treino)
                 "situacao": it.get("situacao"), "situacaoContrato": it.get("situacaoContrato"),

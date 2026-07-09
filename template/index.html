@@ -411,22 +411,29 @@ window.DATA = /*__DATA__*/null;
           <tr><td><b>Uso do app</b></td><td><code>dados.percUtilizamApp</code></td></tr>
           <tr><td><b>Treinos em dia</b></td><td><code>dados.totalTreinosEmdia</code> / <code>percentualEmDia</code></td></tr>
           <tr><td><b>Treinos vencidos</b></td><td><code>dados.totalTreinosVencidos</code> (+ totalTreinosRenovar)</td></tr>
+          <tr><td><b>Nota do treino (rede/unidade)</b></td><td><code>dados.nr1..nr5estrelas</code> → média ponderada</td></tr>
+          <tr><td><b>Nota por professor</b></td><td><code>/psec/treino-bi/dados?idProfessor={id}</code> → nr*estrelas</td></tr>
+          <tr><td><b>Execuções (semana)</b></td><td><code>/psec/treino-bi/treinamento.mediaExecucao[dia].total</code></td></tr>
           <tr><td><b>Avaliações realizadas</b></td><td><code>/psec/avaliacao-fisica-bi.realizadas</code></td></tr>
           <tr><td><b>Avaliações vencidas</b></td><td><code>avaliacao-fisica-bi.atrasadas</code></td></tr>
           <tr><td><b>Atendimento</b></td><td><code>/psec/treino-bi/carteira.totalAlunosEmAcompanhamento</code></td></tr>
-          <tr><td><b>Carteira por aluno (CRM)</b></td><td><code>/clientes/simples</code> (nome, categoria, contrato, contato)</td></tr>
+          <tr><td><b>Carteira por aluno (CRM)</b></td><td><code>/clientes/simples</code> (nome, contrato, contato)</td></tr>
           <tr><td><b>Uso do app por aluno</b></td><td><code>/psec/alunos/alunoApp?cliente=</code> → <code>usaApp</code></td></tr>
+          <tr><td><b>Treino em dia por aluno</b></td><td><code>/psec/treino-bi/alunos-treino-em-dia</code> / <code>-vencido</code> (0-indexado, cruzado por matrícula)</td></tr>
+          <tr><td><b>Modalidade (7 baldes)</b></td><td><code>/v1/contrato/matricula/{matrícula}.descricao</code> → classificador</td></tr>
+          <tr><td><b>Foto do aluno / professor</b></td><td><code>/v1/cliente.pessoa.fotoUrl</code> · <code>bi-professores-vinculos.imageUri</code></td></tr>
+          <tr><td><b>Motivo "Sem Professor"</b></td><td><code>/clientes/{matrícula}/dados-pessoais.objecao</code> (registrado pela equipe)</td></tr>
         </tbody></table></div>
-        <div class="note"><b>Fora do escopo atual:</b> "treinos realizados" (execução) — não é registrado de forma recorrente pelos alunos; "nota do treino" — endpoint <code>avaliacao-treino</code> em erro (500) na Pacto.</div>
+        <div class="note"><b>Depende de processo (lado Pacto), não de código:</b> <b>Atendimento</b> só sobe quando os professores registram o acompanhamento; <b>Motivo "Sem Professor"</b> só aparece quando a equipe preenche o campo <code>objecao</code>; <b>Nota por professor</b> só existe para quem tem avaliações no app.</div>
       </div>
       <div class="meth"><h3>Faixa do aluno (CRM 360º)</h3>
-        <p class="sub">Classificação de engajamento no App Treino, com os dados reais hoje disponíveis (uso do app + contrato). O "treino em dia" por aluno depende de um endpoint da Pacto em erro e entra quando corrigido.</p>
+        <p class="sub">Classificação de engajamento no App Treino (uso do app + contrato). O "treino em dia" por aluno agora vem das listas por-aluno da Pacto e aparece como coluna própria no CRM.</p>
         <div class="scroll"><table class="map"><thead><tr><th>Faixa</th><th>Regra</th></tr></thead><tbody>
           <tr><td><span class="pill c-green">Engajado</span></td><td>Usa o App Treino <b>e</b> contrato vigente (mais de 30 dias).</td></tr>
           <tr><td><span class="pill c-amber">Morno</span></td><td>Usa o app mas contrato a vencer (≤30 dias); <b>ou</b> não usa o app mas contrato em dia.</td></tr>
           <tr><td><span class="pill c-red">Em risco</span></td><td>Não usa o app <b>e</b> contrato a vencer/vencido.</td></tr>
         </tbody></table></div>
-        <div class="note"><b>Base:</b> alunos ativos (contrato vigente) via <code>/clientes/simples</code>, cruzados com <code>alunoApp.usaApp</code>. <b>Público-alvo:</b> o corte Fitness/Ambos × Água/Lutas depende do campo <code>categoria</code>, hoje não preenchido nesta base — fica pendente de uma fonte de modalidade na Pacto.</div>
+        <div class="note"><b>Base:</b> alunos ativos (contrato vigente) via <code>/clientes/simples</code>, cruzados com <code>alunoApp.usaApp</code>. <b>Público-alvo do App Treino</b> = ativos com plano de <b>Fitness</b> (via modalidade do contrato). O corte Fitness/Ambos × Água/Lutas usa os 7 baldes de <code>/v1/contrato/matricula</code>.</div>
       </div>
       <div class="meth"><h3>Arquitetura</h3>
         <p class="sub">Robô no GitHub Actions coleta a API (chaves nos Secrets), valida (gate) e publica no Cloudflare Pages. Atualização diária automática. Os agregados por unidade não têm PII; o CRM por aluno traz nome e contato e por isso a página fica protegida por login (Cloudflare Access).</p>
@@ -471,6 +478,28 @@ window.DATA = /*__DATA__*/null;
       h+='<div class="sec">Atendimento fora do ranking</div><div class="ugrid">';
       h+=PSEUDO_ORDER.filter(k=>pseudo[k].n>0).map(k=>`<div class="ucard"><div class="un">${k}</div><div class="ual">${fmt(pseudo[k].n)} registro(s)</div><div class="urow"><span>Alunos na carteira</span><b>${fmt(pseudo[k].carteira)}</b></div></div>`).join('');
       h+='</div><div class="note"><b>Fora do ranking:</b> Personal Externo, Sem Professor, Treino por IA e Gestão <b>não entram</b> no ranking nem nas médias de professores — são públicos distintos que acompanhamos à parte (ex.: quem é atendido por personal, quem optou por não ter professor, e a adesão ao Treino por IA).</div>';
+    }
+    // ---- Visão dedicada: Treino por IA (adesão) ----
+    const IA=(D.alunos||[]).filter(a=>(state.unit==='all'||a.unit===state.unit)&&NAOPROF(a.professor)==='Treino por IA');
+    if(IA.length){
+      const iTot=IA.length, iApp=IA.filter(a=>a.usaApp===true).length;
+      const iEmDia=IA.filter(a=>a.treinoStatus==='emdia').length, iVenc=IA.filter(a=>a.treinoStatus==='vencido').length;
+      const byU={}; IA.forEach(a=>{byU[a.unit]=(byU[a.unit]||0)+1;});
+      const urows=Object.keys(byU).sort((x,y)=>byU[y]-byU[x]);
+      const iMax=Math.max.apply(null,urows.map(u=>byU[u]).concat([1]));
+      h+='<div class="sec">🤖 Treino por IA — adesão</div>';
+      h+='<div class="kgrid" style="grid-template-columns:repeat(4,1fr)">'
+        +`<div class="kpi"><div class="n"><span class="dot" style="background:#7A5AA8"></span>Alunos no Treino por IA</div><div class="v">${fmt(iTot)}</div><div class="s">${(state.unit==='all'?'rede':uName(state.unit))}</div></div>`
+        +`<div class="kpi"><div class="n"><span class="dot" style="background:#5BAD6F"></span>Usam o app</div><div class="v">${pct(iTot?iApp/iTot*100:0)}</div><div class="s">${fmt(iApp)} de ${fmt(iTot)}</div></div>`
+        +`<div class="kpi"><div class="n"><span class="dot" style="background:#5BAD6F"></span>Treino em dia</div><div class="v">${fmt(iEmDia)}</div><div class="s">${pct(iTot?iEmDia/iTot*100:0)} do grupo</div></div>`
+        +`<div class="kpi"><div class="n"><span class="dot" style="background:#D64545"></span>Treino vencido</div><div class="v">${fmt(iVenc)}</div><div class="s">a renovar</div></div>`
+        +'</div>';
+      if(state.unit==='all'&&urows.length>1){
+        h+='<div class="panel" style="margin-top:12px"><h3>Distribuição por unidade</h3>';
+        h+=urows.map(u=>`<div class="urow" style="align-items:center;gap:10px"><span style="min-width:96px">${uName(u)}</span><i style="display:inline-block;height:10px;border-radius:6px;background:#7A5AA8;width:${Math.round(byU[u]/iMax*100)}%"></i><b>${fmt(byU[u])}</b></div>`).join('');
+        h+='</div>';
+      }
+      h+='<div class="note"><b>Treino por IA</b> = alunos cujo acompanhamento é feito pela geração automática de treino (não por um professor). Grupo identificado pelo marcador no campo professor; métricas de uso do app e treino em dia vêm das mesmas fontes por-aluno do CRM.</div>';
     }
     el.innerHTML=h;
     el.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>profDrawer(tr.dataset.pid));
@@ -580,7 +609,7 @@ window.DATA = /*__DATA__*/null;
     rows.forEach(a=>{ const f=FA[a.faixa]||['—','']; h+=`<tr>
       <td data-label="Aluno"><div class="aluno-cell">${avatar(a)}<div><div class="nm">${esc(a.nome)||'—'}</div><div class="ct">${esc(a.email||'')}${a.telefone?(a.email?' · ':'')+esc(a.telefone):''}</div></div></div></td>`
       +(showUnit?`<td data-label="Unidade">${esc(a.unitNome)}</td>`:'')
-      +`<td class="muted" data-label="Professor">${esc(a.professor)||'—'}</td><td data-label="Modalidade">${modPill(a.modalidade)}</td><td data-label="Faz treino">${fazPill(a.fazTreino)}</td><td data-label="Treino">${treinoPill(a.treinoStatus)}</td><td data-label="Usa o app">${appPill(a.usaApp)}</td><td data-label="Contrato">${contratoPill(a.diasContrato)}</td>
+      +`<td class="muted" data-label="Professor">${esc(a.professor)||'—'}${NAOPROF(a.professor)==='Sem Professor'?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${a.motivoSemProf?('▸ '+esc(a.motivoSemProf)):'<i>motivo não registrado</i>'}</div>`:''}</td><td data-label="Modalidade">${modPill(a.modalidade)}</td><td data-label="Faz treino">${fazPill(a.fazTreino)}</td><td data-label="Treino">${treinoPill(a.treinoStatus)}</td><td data-label="Usa o app">${appPill(a.usaApp)}</td><td data-label="Contrato">${contratoPill(a.diasContrato)}</td>
       <td data-label="Faixa"><span class="pill ${f[1]}">${f[0]}</span></td><td data-label="Score">${scorePill(scoreAluno(a))}</td></tr>`; });
     h+='</tbody></table></div>';
     h+=`<div class="pager"><span style="color:var(--muted);font-size:12.5px">${fmt(A.length)} aluno(s) · página ${state.crmPage} de ${pages}</span>
@@ -630,7 +659,7 @@ window.DATA = /*__DATA__*/null;
       +_fld('Treino',_sel('crmTreino',[['all','Todos'],['emdia','Em dia'],['vencido','Vencido']],state.crmTreino))
       +'</div><p class="sub" style="margin:0 2px 4px">Clique no cabeçalho de qualquer coluna para ordenar.</p>';
     h+='<div id="crmResults" style="margin-top:8px"></div>';
-    h+='<div class="note"><b>Como lemos a faixa (dados reais disponíveis):</b> <b>Engajado</b> = usa o App Treino e contrato vigente; <b>Morno</b> = usa o app mas contrato a vencer, ou não usa mas contrato ok; <b>Em risco</b> = não usa o app e contrato vencendo/vencido. Base desta aba: <b>público-alvo do App Treino</b> = ativos (situação = ATIVO) com <b>plano de Fitness</b> (via <code>/clientes/simples</code> + modalidade do contrato); uso do app via <code>/psec/alunos/alunoApp</code>. <b>Faz treino</b> = aluno vinculado a um <b>professor de treino</b> (via <code>/v1/cliente.vinculos</code> cruzado com <code>bi-professores-vinculos</code>) — é o corte de elegibilidade ao App Treino. <b>Modalidade</b> (Fitness/Água/Luta/Ambos, 7 baldes) vem da descrição do plano em <code>/v1/contrato/matricula/{matricula}</code>. <b>Treino</b> (Em dia/Vencido) por aluno vem das listas <code>alunos-treino-em-dia</code> / <code>alunos-treino-vencido</code>, cruzadas por matrícula.</div>';
+    h+='<div class="note"><b>Como lemos a faixa (dados reais disponíveis):</b> <b>Engajado</b> = usa o App Treino e contrato vigente; <b>Morno</b> = usa o app mas contrato a vencer, ou não usa mas contrato ok; <b>Em risco</b> = não usa o app e contrato vencendo/vencido. Base desta aba: <b>público-alvo do App Treino</b> = ativos (situação = ATIVO) com <b>plano de Fitness</b> (via <code>/clientes/simples</code> + modalidade do contrato); uso do app via <code>/psec/alunos/alunoApp</code>. <b>Faz treino</b> = aluno vinculado a um <b>professor de treino</b> (via <code>/v1/cliente.vinculos</code> cruzado com <code>bi-professores-vinculos</code>) — é o corte de elegibilidade ao App Treino. <b>Modalidade</b> (Fitness/Água/Luta/Ambos, 7 baldes) vem da descrição do plano em <code>/v1/contrato/matricula/{matricula}</code>. <b>Treino</b> (Em dia/Vencido) por aluno vem das listas <code>alunos-treino-em-dia</code> / <code>alunos-treino-vencido</code>, cruzadas por matrícula. <b>Motivo "Sem Professor"</b>: quando o aluno está marcado como Sem Professor, exibimos o motivo que a equipe registra no campo <code>objecao</code> do cadastro no Pacto (<code>/clientes/{matrícula}/dados-pessoais</code>) — enquanto não registrado, aparece "motivo não registrado".</div>';
     el.innerHTML=h;
     el.querySelectorAll('.fsel').forEach(s=>s.onchange=()=>{ const id=s.dataset.sel, v=s.value;
       if(id==='crmUnitSel'){ state.unit=v; state.crmPage=1; renderChips(); renderGeral(); renderProfs(); renderCRM(); renderScore(); return; }
