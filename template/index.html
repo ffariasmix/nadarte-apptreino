@@ -70,7 +70,7 @@
   th{text-align:left;font-size:var(--fs-label);text-transform:uppercase;letter-spacing:.3px;color:var(--muted);font-weight:700;padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}
   td{padding:11px 10px;border-bottom:1px solid var(--line)}tr:last-child td{border:none}
   .tbl{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}.scroll{overflow-x:auto}
-  .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
   .c-red{background:#F8DEDE;color:#A11010}.c-amber{background:#FCF1CF;color:#7A5A00}.c-green{background:#E2F1E7;color:#2F6B3A}.c-gray{background:#EEF1F6;color:#5a6b86}
   .bar{height:7px;border-radius:5px;background:#EEEAE4;overflow:hidden;min-width:70px;flex:1}.bar>i{display:block;height:100%;border-radius:5px}
   .note{background:#FFF8F1;border:1px solid #f6d3bd;border-radius:11px;padding:14px 16px;font-size:var(--fs-caption);color:#7a4a2a;margin-top:14px}
@@ -392,11 +392,18 @@ window.DATA = /*__DATA__*/null;
       <div class="urow"><span>Treinos vencidos</span><b style="color:${N(u.totalTreinosVencidos)>0?'#D64545':'#2D2D2D'}">${fmt(u.totalTreinosVencidos)}</b></div>
       <div class="urow"><span>Avaliações vencidas</span><b>${fmt(u.avaliacoesAtrasadas)}</b></div>
       <div class="urow"><span>Atendimento</span><b>${fmt(u.acompanhamentoEm)}</b></div></div>`).join('')+'</div>';
-    const cols=[['nome','Unidade'],['totalAlunos','Alunos'],['percUtilizamApp','Uso app'],['totalTreinosEmDia','Em dia'],['totalTreinosVencidos','Vencidos'],['avaliacoesRealizadas','Aval. feitas'],['avaliacoesAtrasadas','Aval. vencidas'],['acompanhamentoEm','Acompanh.']];
-    h+='<div class="sec">Tabela comparativa</div><div class="tbl"><div class="scroll"><table><thead><tr>'+cols.map(c=>`<th>${c[1]}</th>`).join('')+'</tr></thead><tbody>';
-    h+=ALL.map(u=>`<tr><td><b>${u.nome}</b></td><td>${fmt(u.totalAlunos)}</td><td>${pct(u.percUtilizamApp)}</td><td>${fmt(u.totalTreinosEmDia)}</td>
+    // público-alvo (Fitness) por unidade + % com programa de treino (exato, por aluno)
+    const alvoStats=uid=>{ const base=(D.alunos||[]).filter(a=>a.unit===uid&&ELEG(a));
+      const alvo=base.length, comT=base.filter(a=>a.treinoStatus!=null).length;
+      return {alvo, comT, pctT: alvo? comT/alvo*100 : null}; };
+    const cols=['Unidade','Público-alvo','% c/ treino','Uso app','Em dia','Vencidos','Aval. feitas','Aval. vencidas','Acompanh.'];
+    h+='<div class="sec">Tabela comparativa</div><p class="sub" style="margin:-4px 2px 8px">Percentuais calculados sobre o <b>público-alvo do App Treino</b> (alunos ativos com plano de Fitness) de cada unidade.</p><div class="tbl"><div class="scroll"><table><thead><tr>'+cols.map(c=>`<th style="white-space:nowrap">${c}</th>`).join('')+'</tr></thead><tbody>';
+    h+=ALL.map(u=>{ const s=alvoStats(u.id); return `<tr><td style="white-space:nowrap"><b>${u.nome}</b></td>
+      <td>${fmt(s.alvo)}</td>
+      <td><b>${s.pctT==null?'—':pct(s.pctT)}</b></td>
+      <td>${pct(u.percUtilizamApp)}</td><td>${fmt(u.totalTreinosEmDia)}</td>
       <td><span class="pill ${N(u.totalTreinosVencidos)>0?'c-red':'c-green'}">${fmt(u.totalTreinosVencidos)}</span></td>
-      <td>${fmt(u.avaliacoesRealizadas)}</td><td><span class="pill ${N(u.avaliacoesAtrasadas)>0?'c-amber':'c-green'}">${fmt(u.avaliacoesAtrasadas)}</span></td><td>${fmt(u.acompanhamentoEm)}</td></tr>`).join('');
+      <td>${fmt(u.avaliacoesRealizadas)}</td><td><span class="pill ${N(u.avaliacoesAtrasadas)>0?'c-amber':'c-green'}">${fmt(u.avaliacoesAtrasadas)}</span></td><td>${fmt(u.acompanhamentoEm)}</td></tr>`; }).join('');
     h+='</tbody></table></div></div>';
     document.getElementById('v-unidades').innerHTML=h;
   }
@@ -608,7 +615,7 @@ window.DATA = /*__DATA__*/null;
     if(!rows.length){ h+=`<tr><td colspan="${showUnit?9:8}"><div class="empty" style="border:none;padding:26px">Nenhum aluno para estes filtros. Tente ampliar a seleção.</div></td></tr>`; }
     rows.forEach(a=>{ const f=FA[a.faixa]||['—','']; h+=`<tr>
       <td data-label="Aluno"><div class="aluno-cell">${avatar(a)}<div><div class="nm">${esc(a.nome)||'—'}</div><div class="ct">${esc(a.email||'')}${a.telefone?(a.email?' · ':'')+esc(a.telefone):''}</div></div></div></td>`
-      +(showUnit?`<td data-label="Unidade">${esc(a.unitNome)}</td>`:'')
+      +(showUnit?`<td data-label="Unidade" style="white-space:nowrap">${esc(a.unitNome)}</td>`:'')
       +`<td class="muted" data-label="Professor">${esc(a.professor)||'—'}${NAOPROF(a.professor)==='Sem Professor'?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${a.motivoSemProf?('▸ '+esc(a.motivoSemProf)):'<i>motivo não registrado</i>'}</div>`:''}</td><td data-label="Modalidade">${modPill(a.modalidade)}</td><td data-label="Faz treino">${fazPill(a.fazTreino)}</td><td data-label="Treino">${treinoPill(a.treinoStatus)}</td><td data-label="Usa o app">${appPill(a.usaApp)}</td><td data-label="Contrato">${contratoPill(a.diasContrato)}</td>
       <td data-label="Faixa"><span class="pill ${f[1]}">${f[0]}</span></td><td data-label="Score">${scorePill(scoreAluno(a))}</td></tr>`; });
     h+='</tbody></table></div>';
