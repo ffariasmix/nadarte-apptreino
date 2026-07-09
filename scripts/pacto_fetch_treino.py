@@ -338,6 +338,43 @@ def prof_treino(key, cid, treino_codes):
         return (None, None, None, None)
 
 # ---------------------------------------------------------------- por unidade
+def treino_status_map(key):
+    """matricula -> 'emdia' | 'vencido' cruzando as listas por-aluno (cp=0 = unidade toda).
+    Endpoints confirmados por probe: /psec/treino-bi/alunos-treino-{em-dia,vencido}/{cp}.
+    So usamos matricula (sem PII). Paginacao com trava anti-loop."""
+    out = {}
+    for ep, status in (("alunos-treino-em-dia", "emdia"), ("alunos-treino-vencido", "vencido")):
+        seen = -1
+        for page in range(1, 21):  # teto: 20 x 1000 = 20k por status/unidade
+            lst = content(key, "/psec/treino-bi/%s/0?page=%d&size=1000" % (ep, page))
+            items = lst if isinstance(lst, list) else (lst.get("content") if isinstance(lst, dict) else None)
+            if not items:
+                break
+            for it in items:
+                m = it.get("matricula")
+                if m is not None:
+                    out[str(m)] = status
+            if len(items) < 1000 or len(out) == seen:  # ultima pagina OU pagina nao avancou
+                break
+            seen = len(out)
+    return out
+
+
+def prof_nota(key, pid):
+    """Nota (estrelas) + treino em dia POR PROFESSOR via dados?idProfessor={pid}. Confirmado por probe."""
+    d = content(key, "/psec/treino-bi/dados?idProfessor=%s" % pid)
+    if not isinstance(d, dict):
+        return {}
+    e = {i: num(d, "nr%destrelas" % i) for i in range(1, 6)}
+    tot = sum(int(x or 0) for x in e.values())
+    nmed = (sum(i * int(e[i] or 0) for i in range(1, 6)) / tot) if tot else None
+    return {
+        "notaMedia": round(nmed, 2) if nmed is not None else None,
+        "notaTotal": int(tot),
+        "percentualAvaliacoes": num(d, "percentualAvaliacoes"),
+    }
+
+
 def coleta_unidade(uk, ulabel, key):
     print("[coleta] %s..." % ulabel, file=sys.stderr)
     df = NOW_MS
@@ -376,6 +413,17 @@ def coleta_unidade(uk, ulabel, key):
                 "renovar30": num(bi, "treinosRenovarEm30Dias"),
                 "tempoMedio": num(tp, "medio") if isinstance(tp, dict) else None,
             })
+    # Nota do treino POR PROFESSOR (KPI7 por prof) — dados?idProfessor={id}, em paralelo leve
+    _pids = [p for p in profs if p.get("id") is not None]
+    if _pids:
+        def _pn(p):
+            p.update(prof_nota(key, p["id"]))
+        with ThreadPoolExecutor(max_workers=5) as _pex:
+            list(_pex.map(_pn, _pids))
+    # Treino em dia / vencido POR ALUNO (KPI2 por aluno) — cruzamento por matricula
+    treino_status = treino_status_map(key)
+    print("  [treino-status] %s: %d matriculas classificadas (em dia/vencido)" % (
+        ulabel, len(treino_status)), file=sys.stderr)
 
     # ---- Carteira ativa (o uso do app roda DEPOIS, em fila global controlada) ----
     carteira = fetch_carteira(key, ulabel)
@@ -444,7 +492,7 @@ def coleta_unidade(uk, ulabel, key):
     # codigos dos professores de treino desta unidade (p/ o join do vinculo do aluno)
     treino_codes = set(str(p["id"]) for p in profs if p.get("id") is not None)
     return {"uk": uk, "ulabel": ulabel, "unit": unidade, "profs": profs, "ativos": ativos,
-            "treino_codes": treino_codes,
+            "treino_codes": treino_codes, "treino_status": treino_status,
             "cat_dist": cat_dist, "sit_dist": sit_dist, "sitc_dist": sitc_dist,
             "carteiraTotal": len(carteira), "biTotal": bi_total}
 
@@ -530,17 +578,21 @@ def main():
     # ---- FASE 3: montar alunos + resumo por unidade ----
     for uk in sorted(resultados):
         r = resultados[uk]
+        tstat = r.get("treino_status", {})
         u_alunos = []
         for it in r.get("ativos", []):
             cid = it.get("codigoCliente") or it.get("matricula")
             fim_ms = parse_date_ms(it.get("fimContrato"))
             ua, faz, pnome, pcod, foto, modal = app_res.get((uk, cid), (None, None, None, None, None, None))
             faixa = classifica(bool(ua), fim_ms) if ua is not None else "semdado"
+            _mat = it.get("matricula")
+            treino_st = tstat.get(str(_mat)) if _mat is not None else None
             u_alunos.append({
                 "unit": uk, "unitNome": r["ulabel"],
                 "nome": it.get("nome"), "matricula": it.get("matricula"),
                 "foto": foto,   # pessoa.fotoUrl (via /v1/cliente)
                 "modalidade": modal,   # 7 baldes (via /v1/contrato/matricula)
+                "treinoStatus": treino_st,   # 'emdia' | 'vencido' | None (via listas por-aluno)
                 "fazTreino": faz, "professor": pnome, "professorId": pcod,
                 "elegivel": faz,   # elegivel ao App Treino = faz treino (vinculo com prof. de treino)
                 "situacao": it.get("situacao"), "situacaoContrato": it.get("situacaoContrato"),
@@ -559,6 +611,8 @@ def main():
             "morno": sum(1 for a in u_alunos if a["faixa"] == "morno"),
             "risco": sum(1 for a in u_alunos if a["faixa"] == "risco"),
             "semdado": sum(1 for a in u_alunos if a["faixa"] == "semdado"),
+            "treinoEmDia": sum(1 for a in u_alunos if a.get("treinoStatus") == "emdia"),
+            "treinoVencido": sum(1 for a in u_alunos if a.get("treinoStatus") == "vencido"),
             "fazTreino": sum(1 for a in u_alunos if a["fazTreino"] is True),
             "naoFazTreino": sum(1 for a in u_alunos if a["fazTreino"] is False),
         }

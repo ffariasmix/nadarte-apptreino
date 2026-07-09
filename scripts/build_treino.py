@@ -23,6 +23,10 @@ def snapshot(data):
     tot = sum(num(u.get("totalAlunos")) for u in unis) or 1
     usoApp = sum(num(u.get("percUtilizamApp")) * num(u.get("totalAlunos")) for u in unis) / tot
     emDia = sum(num(u.get("percentualEmDia")) * num(u.get("totalAlunos")) for u in unis) / tot
+    # nota da rede: media ponderada por nº de avaliacoes (notaTotal) de cada unidade
+    _nw = sum(num(u.get("notaTotal")) for u in unis)
+    notaRede = (sum(num(u.get("notaMedia")) * num(u.get("notaTotal")) for u in unis) / _nw) if _nw else None
+    execSemana = int(sum(num(u.get("execucoesSemana")) for u in unis))
     al = data.get("alunos", [])
     faixa = lambda f: sum(1 for a in al if a.get("faixa") == f)
     return {
@@ -31,6 +35,8 @@ def snapshot(data):
             "usoApp": round(usoApp, 1), "emDiaPct": round(emDia, 1),
             "vencidos": int(sum(num(u.get("totalTreinosVencidos")) for u in unis)),
             "avalVencidas": int(sum(num(u.get("avaliacoesAtrasadas")) for u in unis)),
+            "nota": round(notaRede, 2) if notaRede is not None else None,
+            "execSemana": execSemana,
             "ativos": len(al), "engajado": faixa("engajado"), "morno": faixa("morno"),
             "risco": faixa("risco"), "semdado": faixa("semdado"),
             # uso do app por aluno (qualidade da coleta) e "faz treino" (via vinculo c/ prof.)
@@ -42,7 +48,8 @@ def snapshot(data):
         },
         "unidades": [{"id": u.get("id"), "nome": u.get("nome"),
                       "usoApp": round(num(u.get("percUtilizamApp")), 1),
-                      "emDiaPct": round(num(u.get("percentualEmDia")), 1)} for u in unis],
+                      "emDiaPct": round(num(u.get("percentualEmDia")), 1),
+                      "nota": (round(num(u.get("notaMedia")), 2) if u.get("notaMedia") is not None else None)} for u in unis],
     }
 
 def atualiza_historico(data):
