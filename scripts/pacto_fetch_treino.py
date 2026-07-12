@@ -481,11 +481,26 @@ def coleta_unidade(uk, ulabel, key):
     _estr = {i: num(dados, "nr%destrelas" % i) for i in range(1, 6)}
     _ntot = sum(_estr.values())
     _nmed = (sum(i * _estr[i] for i in range(1, 6)) / _ntot) if _ntot else None
-    # Execucoes por dia da semana (KPI1) — treinamento.mediaExecucao[dia].total
-    _me = (trbi.get("mediaExecucao") if isinstance(trbi, dict) else None) or {}
+    # Execucoes REAIS (KPI1) — treinamento.acessoExecucoesZW = serie diaria {epoch:{execucoesTreino, alunosDoTreino}}
+    # (mediaExecucao NAO era execucao real — coincidia exatamente com a nota; abandonado, confirmado por probe.)
     _DIAS = ["segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"]
-    _execDia = {d: int(num((_me.get(d) or {}), "total")) for d in _DIAS}
-    _execSem = sum(_execDia.values())
+    _ace = (trbi.get("acessoExecucoesZW") if isinstance(trbi, dict) else None) or {}
+    _buck = {d: [] for d in _DIAS}   # execucoesTreino por dia-da-semana (p/ media do dia tipico)
+    _ex_total = 0                    # total de treinos executados (registrados no app) na serie
+    _al_treino = 0                   # alunos que treinaram (acessos) na serie
+    for _ep, _v in (_ace.items() if isinstance(_ace, dict) else []):
+        if not isinstance(_v, dict):
+            continue
+        _ext = int(num(_v, "execucoesTreino"))
+        _ex_total += _ext
+        _al_treino += int(num(_v, "alunosDoTreino"))
+        try:
+            _wd = datetime.datetime.fromtimestamp(int(_ep) / 1000).weekday()  # 0 = segunda
+            _buck[_DIAS[_wd]].append(_ext)
+        except Exception:
+            pass
+    _execDia = {d: (round(sum(_buck[d]) / len(_buck[d])) if _buck[d] else 0) for d in _DIAS}
+    _execSem = sum(_execDia.values())   # treinos executados numa semana tipica (media por dia)
 
     unidade = {
         "id": uk, "nome": ulabel,
@@ -517,9 +532,12 @@ def coleta_unidade(uk, ulabel, key):
         "notaMedia": round(_nmed, 2) if _nmed is not None else None,
         "notaTotal": int(_ntot),
         "percentualAvaliacoes": num(dados, "percentualAvaliacoes"),
-        # ---- Execucoes por dia da semana (treinos realizados) — KPI1 ----
-        "execucoesSemana": _execSem,
-        "execucoesPorDia": _execDia,
+        # ---- Execucoes REAIS (treinos realizados no app) — KPI1, via acessoExecucoesZW ----
+        "execucoesSemana": _execSem,          # media por dia-da-semana, somada (semana tipica)
+        "execucoesPorDia": _execDia,          # execucoesTreino media por dia-da-semana
+        "execucoesTotal": _ex_total,          # total de treinos executados na serie
+        "alunosTreinaram": _al_treino,        # alunos que treinaram (acessos) na serie
+        "diasSerie": len(_ace) if isinstance(_ace, dict) else 0,
     }
     # codigos dos professores de treino desta unidade (p/ o join do vinculo do aluno)
     treino_codes = set(str(p["id"]) for p in profs if p.get("id") is not None)
