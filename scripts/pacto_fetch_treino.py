@@ -485,22 +485,23 @@ def coleta_unidade(uk, ulabel, key):
     # (mediaExecucao NAO era execucao real — coincidia exatamente com a nota; abandonado, confirmado por probe.)
     _DIAS = ["segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"]
     _ace = (trbi.get("acessoExecucoesZW") if isinstance(trbi, dict) else None) or {}
-    _buck = {d: [] for d in _DIAS}   # execucoesTreino por dia-da-semana (p/ media do dia tipico)
+    _buck = {d: [] for d in _DIAS}   # alunosDoTreino por dia-da-semana (frequencia real; media do dia tipico)
     _ex_total = 0                    # total de treinos executados (registrados no app) na serie
     _al_treino = 0                   # alunos que treinaram (acessos) na serie
     for _ep, _v in (_ace.items() if isinstance(_ace, dict) else []):
         if not isinstance(_v, dict):
             continue
         _ext = int(num(_v, "execucoesTreino"))
+        _alt = int(num(_v, "alunosDoTreino"))
         _ex_total += _ext
-        _al_treino += int(num(_v, "alunosDoTreino"))
+        _al_treino += _alt
         try:
             _wd = datetime.datetime.fromtimestamp(int(_ep) / 1000).weekday()  # 0 = segunda
-            _buck[_DIAS[_wd]].append(_ext)
+            _buck[_DIAS[_wd]].append(_alt)   # frequencia real: alunos que treinaram
         except Exception:
             pass
     _execDia = {d: (round(sum(_buck[d]) / len(_buck[d])) if _buck[d] else 0) for d in _DIAS}
-    _execSem = sum(_execDia.values())   # treinos executados numa semana tipica (media por dia)
+    _execSem = sum(_execDia.values())   # alunos que treinaram numa semana tipica (media por dia)
 
     unidade = {
         "id": uk, "nome": ulabel,
