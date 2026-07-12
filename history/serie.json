@@ -548,17 +548,17 @@
    "vencidos": 881,
    "avalVencidas": 500,
    "nota": 4.93,
-   "execSemana": 2763,
-   "ativos": 4992,
-   "engajado": 1089,
-   "morno": 3466,
-   "risco": 437,
+   "execSemana": 468,
+   "ativos": 5009,
+   "engajado": 1090,
+   "morno": 3477,
+   "risco": 442,
    "semdado": 0,
-   "appSim": 1208,
-   "appNao": 3784,
+   "appSim": 1209,
+   "appNao": 3800,
    "appFalha": 0,
-   "fazTreino": 3414,
-   "naoFazTreino": 1466
+   "fazTreino": 3390,
+   "naoFazTreino": 1444
   },
   "unidades": [
    {
