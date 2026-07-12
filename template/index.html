@@ -71,6 +71,10 @@
   td{padding:11px 10px;border-bottom:1px solid var(--line)}tr:last-child td{border:none}
   .tbl{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}.scroll{overflow-x:auto}
   .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .hbtn{font-size:11.5px;font-weight:600;padding:4px 12px;border-radius:999px;border:1px solid var(--color-border,#E7E3DD);background:var(--color-surface,#fff);color:var(--muted,#6B7280);cursor:pointer}
+  .hbtn.on{background:#7A5AA8;border-color:#7A5AA8;color:#fff}
+  [data-theme="dark"] .hbtn{background:#26241f;border-color:#403c37;color:#b8b2a8}
+  [data-theme="dark"] .hbtn.on{background:#7A5AA8;border-color:#7A5AA8;color:#fff}
   .c-red{background:#F8DEDE;color:#A11010}.c-amber{background:#FCF1CF;color:#7A5A00}.c-green{background:#E2F1E7;color:#2F6B3A}.c-gray{background:#EEF1F6;color:#5a6b86}
   .bar{height:7px;border-radius:5px;background:#EEEAE4;overflow:hidden;min-width:70px;flex:1}.bar>i{display:block;height:100%;border-radius:5px}
   .note{background:#FFF8F1;border:1px solid #f6d3bd;border-radius:11px;padding:14px 16px;font-size:var(--fs-caption);color:#7a4a2a;margin-top:14px}
@@ -194,7 +198,7 @@ window.DATA = /*__DATA__*/null;
   const N = v => Number(v)||0;
   if(D.gerado_em){ try{ document.getElementById('asof').textContent = new Date(D.gerado_em).toLocaleString('pt-BR'); }catch(e){} }
 
-  let state = {unit:'all', tab:'geral', crmFaixa:'all', crmPub:'all', crmMod:'all', crmProf:'all', crmContrato:'all', crmTreino:'all', crmQ:'', crmPage:1, crmSort:{k:null,dir:1}, profSort:{k:null,dir:1}, scoreIni:'all', scoreProf:'all', scoreContrato:'all', scoreQ:'', scorePage:1, scoreSort:{k:null,dir:1}};
+  let state = {unit:'all', tab:'geral', crmFaixa:'all', crmPub:'all', crmMod:'all', crmProf:'all', crmContrato:'all', crmTreino:'all', crmQ:'', crmPage:1, crmSort:{k:null,dir:1}, profSort:{k:null,dir:1}, scoreIni:'all', scoreProf:'all', scoreContrato:'all', scoreQ:'', scorePage:1, scoreSort:{k:null,dir:1}, histPeriod:'dia'};
   const sel = () => state.unit==='all' ? ALL : ALL.filter(u=>u.id===state.unit);
   const sum = k => sel().reduce((a,u)=>a+N(u[k]),0);
   const wavg = (k,w) => { let n=0,d=0; sel().forEach(u=>{const ww=N(u[w]); if(u[k]!=null){n+=Number(u[k])*ww; d+=ww;}}); return d?n/d:null; };
@@ -225,7 +229,7 @@ window.DATA = /*__DATA__*/null;
   }
   function donut(segs){
     const tot=segs.reduce((a,s)=>a+s.value,0)||1; const cx=90,cy=95,r=70,rin=46; let ang=-Math.PI/2;
-    let s=`<svg viewBox="0 0 330 195" width="100%">`;
+    let s=`<svg viewBox="0 0 330 195" width="100%" style="max-width:330px;display:block">`;
     segs.forEach(seg=>{const a2=ang+2*Math.PI*(seg.value/tot);
       const x1=cx+r*Math.cos(ang),y1=cy+r*Math.sin(ang),x2=cx+r*Math.cos(a2),y2=cy+r*Math.sin(a2);
       const xi1=cx+rin*Math.cos(a2),yi1=cy+rin*Math.sin(a2),xi2=cx+rin*Math.cos(ang),yi2=cy+rin*Math.sin(ang);
@@ -244,26 +248,44 @@ window.DATA = /*__DATA__*/null;
     let s=`<svg viewBox="0 0 ${w} ${h}" width="100%">`;
     [0,.5,1].forEach(g=>{const y=padT+(h-padT-padB)*g; s+=`<line x1="${padL}" y1="${y}" x2="${w-padR}" y2="${y}" stroke="#EEEAE4"/>`;});
     const step=Math.max(1,Math.ceil(xs/8));
-    pts.forEach((p,i)=>{ if(i%step===0) s+=`<text x="${X(i)}" y="${h-6}" text-anchor="middle" font-size="9.5" fill="#8A8A8A">${String(p.d).slice(8)}/${String(p.d).slice(5,7)}</text>`;});
+    pts.forEach((p,i)=>{ if(i%step===0) s+=`<text x="${X(i)}" y="${h-6}" text-anchor="middle" font-size="9.5" fill="#8A8A8A">${p.lbl||''}</text>`;});
     keys.forEach(k=>{ let d='',pen=false; pts.forEach((p,i)=>{const v=p[k.k]; if(v==null||!isFinite(v)){pen=false;return;} d+=(pen?'L':'M')+X(i)+' '+Y(v)+' '; pen=true;});
       s+=`<path d="${d}" fill="none" stroke="${k.c}" stroke-width="2.5" stroke-linejoin="round"/>`;
       pts.forEach((p,i)=>{const v=p[k.k]; if(v==null||!isFinite(v))return; s+=`<circle cx="${X(i)}" cy="${Y(v)}" r="3" fill="${k.c}"/>`;});});
     s+='</svg>';
     return s+'<div style="margin-top:4px">'+keys.map(k=>`<span style="font-size:12px;color:var(--muted);margin-right:14px"><b style="color:${k.c}">■</b> ${k.n}</span>`).join('')+'</div>';
   }
+  function histBucket(dstr,per){ const p=String(dstr).split('-').map(Number),y=p[0],m=p[1],dd=p[2];
+    if(per==='mes') return y+'-'+String(m).padStart(2,'0');
+    if(per==='ano') return String(y);
+    if(per==='semana'){ const dt=new Date(y,m-1,dd),j=new Date(y,0,1); const wk=Math.ceil((((dt-j)/86400000)+j.getDay()+1)/7); return y+'-S'+String(wk).padStart(2,'0'); }
+    return String(dstr); }
+  function histLabel(k,per){ const MES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+    if(per==='mes'){ const a=k.split('-'); return MES[+a[1]-1]+'/'+a[0].slice(2); }
+    if(per==='ano') return k;
+    if(per==='semana') return 'S'+k.split('-S')[1];
+    return k.slice(8)+'/'+k.slice(5,7); }
   function histPanel(){
     const H=(D.historico||[]);
-    const pts=H.map(s=>{ let uso,emdia,nota;
+    const daily=H.map(s=>{ let uso,emdia,nota;
       if(state.unit==='all'){ uso=N(s.rede&&s.rede.usoApp); emdia=N(s.rede&&s.rede.emDiaPct); nota=(s.rede&&s.rede.nota); }
       else { const u=(s.unidades||[]).find(x=>x.id===state.unit)||{}; uso=N(u.usoApp); emdia=N(u.emDiaPct); nota=u.nota; }
       return {d:s.data, uso, emdia, satisf:(nota==null?null:Math.round(N(nota)/5*1000)/10)}; });
+    const per=state.histPeriod||'dia';
+    let pts;
+    if(per==='dia'){ pts=daily.map(p=>({lbl:histLabel(p.d,'dia'),uso:p.uso,emdia:p.emdia,satisf:p.satisf})); }
+    else { const g={}; daily.forEach(p=>{const k=histBucket(p.d,per);(g[k]=g[k]||[]).push(p);});
+      pts=Object.keys(g).sort().map(k=>{ const arr=g[k]; const avg=f=>{const v=arr.map(x=>x[f]).filter(x=>x!=null&&isFinite(x)); return v.length? Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10 : null;};
+        return {lbl:histLabel(k,per),uso:avg('uso'),emdia:avg('emdia'),satisf:avg('satisf')}; }); }
     const temNota=pts.some(p=>p.satisf!=null);
     const series=[{k:'uso',n:'Uso do app (%)',c:'#7A5AA8'},{k:'emdia',n:'Fichas em dia (%)',c:'#5BAD6F'}];
     if(temNota) series.push({k:'satisf',n:'Satisfação (nota÷5, %)',c:'#F2C94C'});
-    const title='<h3>Evolução — uso do app, fichas em dia'+(temNota?' e satisfação':'')+'</h3><p class="sub">'+(state.unit==='all'?'rede':uName(state.unit))+' · acumula com as coletas diárias</p>';
+    const PL={dia:'Diário',semana:'Semanal',mes:'Mensal',ano:'Anual'};
+    const seletor='<div style="display:flex;gap:6px;margin:2px 0 8px">'+['dia','semana','mes','ano'].map(p=>`<button class="hbtn${per===p?' on':''}" data-hp="${p}">${PL[p]}</button>`).join('')+'</div>';
+    const title='<h3>Evolução — uso do app, fichas em dia'+(temNota?' e satisfação':'')+'</h3><p class="sub">'+(state.unit==='all'?'rede':uName(state.unit))+' · '+PL[per].toLowerCase()+' · acumula com as coletas diárias</p>';
     if(pts.length<2)
-      return '<div class="panel">'+title+'<div class="empty" style="border:none;padding:22px 6px">Acumulando histórico — '+pts.length+' dia(s). A curva aparece a partir do 2º dia.</div></div>';
-    return '<div class="panel">'+title+lineChart(pts,series)+'</div>';
+      return '<div class="panel">'+title+seletor+'<div class="empty" style="border:none;padding:22px 6px">Acumulando histórico — '+pts.length+' ponto(s) neste período. A curva aparece a partir de 2 pontos.</div></div>';
+    return '<div class="panel">'+title+seletor+lineChart(pts,series)+'</div>';
   }
 
   function renderGeral(){
@@ -278,16 +300,24 @@ window.DATA = /*__DATA__*/null;
     const DLAB={segunda:'Seg',terca:'Ter',quarta:'Qua',quinta:'Qui',sexta:'Sex',sabado:'Sáb',domingo:'Dom'};
     const execDia=DIAS.map(d=>({dia:d, v: sel().reduce((a,u)=>a+((u.execucoesPorDia||{})[d]||0),0)}));
     const tf=wavgRobusto('tempoMedioPermanenciaTreino','totalAlunos');   // guard-rail de outlier
+    // ---- Base apta (fonte única da verdade): aptos = 4 categorias Fitness ----
+    const B=(D.alunos&&D.alunos.length)? crmBase() : [];       // aptos na seleção (por aluno)
+    const Bfull=(D.alunos&&D.alunos.length)? crmBaseFull() : []; // ativos na seleção
+    const apta=B.length, ativa=Bfull.length;
+    const appSim=B.filter(a=>a.usaApp===true).length;
+    const emDiaB=B.filter(a=>a.treinoStatus==='emdia').length;
+    const vencB=B.filter(a=>a.treinoStatus==='vencido').length;
+    const pctOf=(n,d)=> d? pct(n/d*100) : '—';
     const K=[
-      {n:'Alunos na base',dot:'#2D2D2D',v:fmt(totAl),s:fmt(sum('totalAlunosAtivos'))+' ativos'},
-      {n:'Uso do App Treino',dot:'#7A5AA8',v:pct(wavg('percUtilizamApp','totalAlunos')),s:'% dos alunos que usam o app'},
-      {n:'Nota do treino',dot:'#F2C94C',v:nmed==null?'—':nota1(nmed)+'★',s:fmt(ntot)+' avaliações no app'},
-      {n:'Execuções (semana)',dot:'#5BAD6F',v:fmt(execSem),s:'treinos realizados numa semana típica'},
-      {n:'Treinos em dia',dot:'#5BAD6F',v:fmt(sum('totalTreinosEmDia')),s:pct(wavg('percentualEmDia','totalAlunos'))+' da base'},
-      {n:'Treinos vencidos',dot:'#D64545',v:fmt(sum('totalTreinosVencidos')),s:'a renovar: '+fmt(sum('totalTreinosRenovar'))},
-      {n:'Avaliações realizadas',dot:'#3E6DAA',v:fmt(sum('avaliacoesRealizadas')),s:'últimos 12 meses'},
-      {n:'Avaliações vencidas',dot:'#F2C94C',v:fmt(sum('avaliacoesAtrasadas')),s:'atrasadas / reavaliar'},
-      {n:'Atendimento (professores)',dot:'#0EA5A0',v:fmt(sum('acompanhamentoEm')),s:'alunos em acompanhamento'},
+      {n:'Alunos aptos ao App',dot:'#2D2D2D',v:fmt(apta),s:pctOf(apta,ativa)+' dos '+fmt(ativa)+' ativos (Nad\'Arte)'},
+      {n:'Uso do App Treino',dot:'#7A5AA8',v:fmt(appSim),s:pctOf(appSim,apta)+' da base apta'},
+      {n:'Treinos em dia',dot:'#5BAD6F',v:fmt(emDiaB),s:pctOf(emDiaB,apta)+' da base apta'},
+      {n:'Treinos vencidos',dot:'#D64545',v:fmt(vencB),s:pctOf(vencB,apta)+' da base apta'},
+      {n:'Treinos a renovar',dot:'#F2C94C',v:fmt(sum('totalTreinosRenovar')),s:'fichas prestes a vencer (rede)'},
+      {n:'Nota do treino',dot:'#F2C94C',v:nmed==null?'—':nota1(nmed)+'★',s:fmt(ntot)+' avaliações no app (rede)'},
+      {n:'Avaliações físicas',dot:'#3E6DAA',v:fmt(sum('avaliacoesRealizadas')),s:'realizadas · últimos 12 meses (rede)'},
+      {n:'Avaliações vencidas',dot:'#F2C94C',v:fmt(sum('avaliacoesAtrasadas')),s:'físicas a reavaliar (rede)'},
+      {n:'Atendimento (professores)',dot:'#0EA5A0',v:fmt(sum('acompanhamentoEm')),s:'alunos em acompanhamento (rede)'},
       {n:'Tempo médio de ficha',dot:'#E8521A',v:fmt(tf.v),s:'dias de permanência (média)'},
     ];
     let h='<div class="sec">'+(state.unit==='all'?'Panorama da rede':'Unidade: '+uName(state.unit))+'</div><div class="kgrid">';
@@ -299,9 +329,10 @@ window.DATA = /*__DATA__*/null;
       h+='<div class="sec">Modalidade — público-alvo do App Treino</div>'+modPanel(crmBase())
         +`<p class="sub" style="margin:8px 2px 0">Considera só o <b>público-alvo</b> = planos com <b>Fitness</b> (Fitness · Ambos Água+Fitness · Ambos Fitness+Luta · Ambos Água+Fitness+Luta): <b>${fmt(alvo)}</b> de ${fmt(base)} ativos. Fora do recorte: <b>${fmt(fora)}</b> (Água/Luta só, Outros) — não entram nas métricas do app.</p>`;
     }
+    const aptaUnit=uid=>{const b=(D.alunos||[]).filter(a=>a.unit===uid&&ELEG(a));const ap=b.filter(a=>a.usaApp===true).length;return b.length? ap/b.length*100 : 0;};
     h+='<div class="sec">Gráficos</div><div class="grid2">';
-    h+='<div class="panel"><h3>Uso do app por unidade</h3><p class="sub">% de alunos que usam o App Treino</p>'
-       +hbars(ALL.map(u=>({label:u.nome,value:N(u.percUtilizamApp)})),'#7A5AA8',v=>pct(v))+'</div>';
+    h+='<div class="panel"><h3>Uso do app por unidade</h3><p class="sub">% da base apta (Fitness) que usa o App Treino</p>'
+       +hbars(ALL.map(u=>({label:u.nome,value:aptaUnit(u.id)})),'#7A5AA8',v=>pct(v))+'</div>';
     h+='<div class="panel"><h3>Nota do treino (estrelas)</h3><p class="sub">avaliações dos alunos no app — '+(state.unit==='all'?'rede':uName(state.unit))+'</p>'
        +'<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">'
        +`<div style="text-align:center;min-width:84px"><div style="font-size:38px;font-weight:800;line-height:1;color:#E0A400">${nmed==null?'—':nota1(nmed)}</div><div style="color:var(--muted);font-size:12px;margin-top:4px">★ média · ${fmt(ntot)} aval.</div></div>`
@@ -312,14 +343,17 @@ window.DATA = /*__DATA__*/null;
      h+='<div class="panel"><h3>Execuções por dia da semana</h3><p class="sub">treinos realizados — '+(state.unit==='all'?'rede':uName(state.unit))+' · '+fmt(execSem)+' na semana</p>'
        +execDia.map(x=>`<div style="display:flex;align-items:center;gap:10px;margin:5px 0"><span style="width:34px;font-size:12px;color:var(--muted)">${DLAB[x.dia]}</span><div class="bar"><i style="width:${x.v/mx*100}%;background:#5BAD6F"></i></div><span style="width:54px;text-align:right;font-size:12px;font-weight:700">${fmt(x.v)}</span></div>`).join('')
        +'</div>';})();
-    h+='<div class="panel"><h3>Situação das fichas</h3><p class="sub">na seleção atual</p>'
-       +donut([{label:'Em dia',value:sum('totalTreinosEmDia'),color:'#5BAD6F'},{label:'Vencidas',value:sum('totalTreinosVencidos'),color:'#D64545'},{label:'A renovar',value:sum('totalTreinosRenovar'),color:'#F2C94C'}])+'</div>';
-    h+='<div class="panel"><h3>Treinos vencidos por unidade</h3><p class="sub">fichas a renovar</p>'
-       +hbars(ALL.map(u=>({label:u.nome,value:N(u.totalTreinosVencidos)})),'#D64545',v=>fmt(v))+'</div>';
+    h+='<div class="panel"><h3>Situação das fichas</h3><p class="sub">base apta · na seleção atual</p>'
+       +donut([{label:'Em dia',value:emDiaB,color:'#5BAD6F'},{label:'Vencidas',value:vencB,color:'#D64545'}])+'</div>';
+    const vencUnit=uid=>(D.alunos||[]).filter(a=>a.unit===uid&&ELEG(a)&&a.treinoStatus==='vencido').length;
+    h+='<div class="panel"><h3>Treinos vencidos por unidade</h3><p class="sub">base apta · fichas vencidas</p>'
+       +hbars(ALL.map(u=>({label:u.nome,value:vencUnit(u.id)})),'#D64545',v=>fmt(v))+'</div>';
     h+=histPanel();
     h+='</div>';
-    h+='<div class="note"><b>Cobertura:</b> indicadores ao vivo do BI Treino/Avaliação da Pacto, agregados por unidade. "Treinos realizados" foi retirado (não é alimentado pelos alunos); "nota do treino" depende de um endpoint da Pacto em erro. Detalhe por professor na aba <b>Professores 360º</b> e por aluno na aba <b>CRM 360º</b>.</div>';
-    document.getElementById('v-geral').innerHTML=h;
+    h+='<div class="note"><b>Base:</b> os cards <b>Alunos aptos, Uso do App e Treinos em dia/vencidos</b> são calculados <b>por aluno</b> sobre a <b>base apta</b> (planos com Fitness) — mesma fonte da verdade do CRM. <b>Nota, Avaliações físicas, Atendimento e "a renovar"</b> vêm do BI da Pacto como <b>total da rede/unidade</b> (a Pacto não expõe esses por aluno, então não são recortados por Fitness). Detalhe por professor na aba <b>Professores 360º</b> e por aluno na aba <b>CRM 360º</b>. Metodologia completa na aba <b>Metodologia &amp; API</b>.</div>';
+    const gel=document.getElementById('v-geral');
+    gel.innerHTML=h;
+    gel.querySelectorAll('.hbtn').forEach(b=>b.onclick=()=>{ state.histPeriod=b.dataset.hp; renderGeral(); });
   }
   function uName(id){return (ALL.find(u=>u.id===id)||{}).nome||id;}
   function indiceHero(){
@@ -340,16 +374,18 @@ window.DATA = /*__DATA__*/null;
     const uu = unitId==='all' ? ALL : ALL.filter(u=>u.id===unitId);
     const eligB = (D.alunos||[]).filter(a => (unitId==='all'||a.unit===unitId) && ELEG(a));  // público-alvo
     const el = eligB.length||1;
-    const usoApp = eligB.filter(a=>a.usaApp===true).length/el*100;
-    const treino = wavgOf(uu,'percentualEmDia','totalAlunos')||0;
+    const appUsers = eligB.filter(a=>a.usaApp===true);   // quem usa o app (base dos pilares abaixo)
+    const au = appUsers.length||1;
+    const usoApp = appUsers.length/el*100;                                    // % apta que usa o app
+    const treino = appUsers.filter(a=>a.treinoStatus==='emdia').length/au*100; // % de quem usa o app com treino em dia
     const rea=sumOf(uu,'avaliacoesRealizadas'), atr=sumOf(uu,'avaliacoesAtrasadas');
     const aval=(rea+atr)? rea/(rea+atr)*100 : 0;
     const atd=sumOf(uu,'totalAlunos')? sumOf(uu,'acompanhamentoEm')/sumOf(uu,'totalAlunos')*100 : 0;
     const defs=[
-      {k:'Uso do App',v:usoApp,alvo:100,peso:0.30},
-      {k:'Treinos em dia',v:treino,alvo:85,peso:0.30},
-      {k:'Avaliações em dia',v:aval,alvo:75,peso:0.20},
-      {k:'Atendimento',v:atd,alvo:100,peso:0.20},
+      {k:'Uso do App',v:usoApp,alvo:100,peso:0.30,base:'da base apta'},
+      {k:'Treinos em dia',v:treino,alvo:85,peso:0.30,base:'de quem usa o app'},
+      {k:'Avaliações em dia',v:aval,alvo:75,peso:0.20,base:'unidade (proxy)'},
+      {k:'Atendimento',v:atd,alvo:100,peso:0.20,base:'unidade (proxy)'},
     ];
     defs.forEach(d=>d.at=Math.min(100, d.alvo? d.v/d.alvo*100 : 0));
     return {defs, indice:Math.round(defs.reduce((a,d)=>a+d.peso*d.at,0)), eleg:eligB.length};
@@ -361,14 +397,14 @@ window.DATA = /*__DATA__*/null;
     let h='<div class="sec">Índice de metas (0–100)</div><div class="panel"><div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">'
       +`<div style="text-align:center;min-width:96px"><div style="font-size:44px;font-weight:800;line-height:1;color:${metaFarol(m.indice)}">${m.indice}</div><div style="color:var(--muted);font-size:12px;margin-top:5px">índice ponderado</div></div>`
       +'<div style="flex:1;min-width:300px">';
-    h+=m.defs.map(d=>`<div style="display:flex;align-items:center;gap:10px;margin:8px 0">
-      <div style="width:134px;font-size:12.5px;font-weight:600">${d.k} <span style="color:var(--muted);font-weight:400">${Math.round(d.peso*100)}%</span></div>
-      <div class="bar"><i style="width:${Math.min(100,d.alvo?d.v/d.alvo*100:0)}%;background:${metaFarol(d.at)}"></i></div>
-      <div style="width:132px;text-align:right;font-size:12px"><b>${pct(d.v)}</b> <span style="color:var(--muted)">/ alvo ${d.alvo}%</span></div></div>`).join('');
+    h+=m.defs.map(d=>`<div style="display:flex;align-items:center;gap:12px;margin:10px 0">
+      <div style="width:172px;font-size:12.5px"><b>${d.k}</b><div style="color:var(--muted);font-size:11px">peso ${Math.round(d.peso*100)}% · base ${d.base}</div></div>
+      <div class="bar" title="atingimento do alvo"><i style="width:${d.at}%;background:${metaFarol(d.at)}"></i></div>
+      <div style="width:158px;text-align:right;font-size:12px"><b style="font-size:14px">${pct(d.v)}</b> <span style="color:var(--muted)">/ alvo ${d.alvo}%</span><div style="color:${metaFarol(d.at)};font-size:11px;font-weight:700">${Math.round(d.at)}% do alvo</div></div></div>`).join('');
     h+='</div></div>';
     const atd=m.defs.find(d=>d.k==='Atendimento');
-    h+='<div class="note"><b>Índice de metas</b> = média ponderada do atingimento — <b>Uso do App 30%</b> (aptos com treino e cadastro no app · alvo 100%) · <b>Treinos em dia 30%</b> (alvo 85%) · <b>Avaliações em dia 20%</b> (alvo ≥75% dos aptos) · <b>Atendimento 20%</b> (alvo: ≥1 atendimento/mês por aluno). A <b>nota do treino (NPS)</b> é indicador à parte — não entra no índice. Verde = meta batida · amarelo = perto · vermelho = distante.'
-      + ((atd && atd.v<5) ? ' <b>Atendimento vem baixo</b> porque os professores ainda não registram atendimento pelo App Treino — é a meta a acelerar (por isso tem peso alto).' : '')
+    h+='<div class="note"><b>Como ler:</b> o <b>peso</b> é quanto o pilar vale na nota final; a <b>barra</b> mostra o <b>atingimento</b> (atual ÷ alvo); à direita, o <b>atual</b> e o <b>alvo</b>. Índice = Σ(peso × atingimento). Pilares: <b>Uso do App</b> (peso 30%, base apta, alvo 100%) · <b>Treinos em dia</b> (30%, base = quem usa o app, alvo 85%) · <b>Avaliações em dia</b> (20%, alvo 75% — <i>proxy da unidade, a Pacto não expõe avaliação por aluno</i>) · <b>Atendimento</b> (20%, alvo 100% — <i>proxy da unidade</i>). A <b>nota do treino</b> é indicador à parte. Verde = meta batida · amarelo = perto · vermelho = distante.'
+      + ((atd && atd.v<5) ? ' <b>Atendimento vem baixo</b> porque os professores ainda não registram atendimento pelo App Treino.' : '')
       + '</div>';
     return h;
   }
@@ -572,11 +608,17 @@ window.DATA = /*__DATA__*/null;
   function modDist(list){ const d={}; MOD_ORDER.forEach(k=>d[k]=0); list.forEach(a=>{d[modKey(a)]++;}); return d; }
   function modPanel(list){
     const d=modDist(list), tot=list.length||1, max=Math.max(1,...MOD_ORDER.map(k=>d[k]));
-    let h='<div class="panel"><h3>Distribuição por modalidade</h3><p class="sub">via contrato/plano do aluno — '+(state.unit==='all'?'rede':uName(state.unit))+'</p>';
-    h+=MOD_ORDER.filter(k=>d[k]>0).map(k=>`<div style="display:flex;align-items:center;gap:12px;margin:9px 0">
+    const appOf=k=>list.filter(a=>modKey(a)===k && a.usaApp===true).length;   // usam o app nessa modalidade
+    let h='<div class="panel"><h3>Distribuição por modalidade</h3><p class="sub">público-alvo · barra cheia = usa o app · clara = ainda não usa — '+(state.unit==='all'?'rede':uName(state.unit))+'</p>';
+    h+=MOD_ORDER.filter(k=>d[k]>0).map(k=>{ const cnt=d[k], app=appOf(k), pApp=cnt?app/cnt*100:0;
+      return `<div style="display:flex;align-items:center;gap:12px;margin:9px 0">
       <div style="min-width:186px;font-size:12.5px;font-weight:600">${MOD_LABEL[k]}</div>
-      <div class="bar" style="max-width:320px"><i style="width:${d[k]/max*100}%;background:${MOD_COLOR[k]}"></i></div>
-      <div style="font-weight:800;font-size:14px;min-width:96px;text-align:right">${fmt(d[k])} <span style="color:var(--muted);font-weight:600;font-size:11.5px">(${pct(d[k]/tot*100)})</span></div></div>`).join('');
+      <div style="max-width:300px;flex:1;height:8px;border-radius:5px;background:#EEEAE4;overflow:hidden;display:flex" title="${fmt(app)} usam o app · faltam ${fmt(cnt-app)}">
+        <i style="height:100%;width:${app/max*100}%;background:${MOD_COLOR[k]}"></i>
+        <i style="height:100%;width:${(cnt-app)/max*100}%;background:${MOD_COLOR[k]}40"></i></div>
+      <div style="min-width:150px;text-align:right;font-size:12px">
+        <b style="font-size:14px">${fmt(cnt)}</b> <span style="color:var(--muted);font-size:11px">(${pct(cnt/tot*100)})</span>
+        <div style="color:var(--muted);font-size:11px">${pct(pApp)} no app · <b style="color:#B5731A">falta ${pct(100-pApp)}</b></div></div></div>`;}).join('');
     h+='</div>'; return h;
   }
 
