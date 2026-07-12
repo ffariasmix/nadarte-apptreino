@@ -544,21 +544,21 @@
   "data": "2026-07-12",
   "rede": {
    "usoApp": 41.1,
-   "emDiaPct": 63.0,
-   "vencidos": 884,
+   "emDiaPct": 63.3,
+   "vencidos": 881,
    "avalVencidas": 500,
    "nota": 4.93,
-   "execSemana": 2757,
-   "ativos": 5004,
+   "execSemana": 2763,
+   "ativos": 4992,
    "engajado": 1089,
-   "morno": 3473,
-   "risco": 442,
+   "morno": 3466,
+   "risco": 437,
    "semdado": 0,
    "appSim": 1208,
-   "appNao": 3796,
+   "appNao": 3784,
    "appFalha": 0,
-   "fazTreino": 3454,
-   "naoFazTreino": 1484
+   "fazTreino": 3414,
+   "naoFazTreino": 1466
   },
   "unidades": [
    {
@@ -579,7 +579,7 @@
     "id": "905Sul",
     "nome": "905 Sul",
     "usoApp": 36.3,
-    "emDiaPct": 72.0,
+    "emDiaPct": 73.0,
     "nota": 4.98
    },
    {
