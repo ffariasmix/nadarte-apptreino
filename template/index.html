@@ -198,7 +198,7 @@ window.DATA = /*__DATA__*/null;
   const N = v => Number(v)||0;
   if(D.gerado_em){ try{ document.getElementById('asof').textContent = new Date(D.gerado_em).toLocaleString('pt-BR'); }catch(e){} }
 
-  let state = {unit:'all', tab:'geral', crmFaixa:'all', crmPub:'all', crmMod:'all', crmProf:'all', crmContrato:'all', crmTreino:'all', crmRec:'all', crmQ:'', crmPage:1, crmSort:{k:null,dir:1}, profSort:{k:null,dir:1}, scoreIni:'all', scoreProf:'all', scoreContrato:'all', scoreQ:'', scorePage:1, scoreSort:{k:null,dir:1}, histPeriod:'dia'};
+  let state = {unit:'all', tab:'geral', crmFaixa:'all', crmPub:'all', crmMod:'all', crmProf:'all', crmContrato:'all', crmTreino:'all', crmRec:'all', crmIsa:'all', crmQ:'', crmPage:1, crmSort:{k:null,dir:1}, profSort:{k:null,dir:1}, scoreIni:'all', scoreProf:'all', scoreContrato:'all', scoreQ:'', scorePage:1, scoreSort:{k:null,dir:1}, histPeriod:'dia'};
   const sel = () => state.unit==='all' ? ALL : ALL.filter(u=>u.id===state.unit);
   const sum = k => sel().reduce((a,u)=>a+N(u[k]),0);
   const wavg = (k,w) => { let n=0,d=0; sel().forEach(u=>{const ww=N(u[w]); if(u[k]!=null){n+=Number(u[k])*ww; d+=ww;}}); return d?n/d:null; };
@@ -324,6 +324,17 @@ window.DATA = /*__DATA__*/null;
     h+=K.map(c=>`<div class="kpi"><div class="n"><span class="dot" style="background:${c.dot}"></span>${c.n}</div><div class="v">${c.v}</div><div class="s">${c.s}</div></div>`).join('')+'</div>';
     if(tf.fora.length) h+='<div class="note">⚠ <b>Dado atípico detectado (automático):</b> '+tf.fora.join(', ')+' com valor fora do padrão em <b>"Tempo médio de ficha"</b> — excluído da média da rede até os dados normalizarem no Pacto. A mensagem some sozinha quando o número voltar ao normal.</div>';
     h+=metasPanel();
+    h+=(function(){ if(!B.length) return '';
+      const cnt={sau:0,ate:0,rmo:0,ralto:0,crit:0}; B.forEach(a=>{cnt[isaKey(isaScore(a))]++;}); const tot=B.length;
+      const avg=Math.round(B.reduce((s,a)=>s+isaScore(a),0)/tot);
+      const COL={sau:'#5BAD6F',ate:'#F2C94C',rmo:'#E8934C',ralto:'#D64545',crit:'#8B1A1A'};
+      let x='<div class="sec">Saúde dos alunos (ISA)</div><div class="panel"><div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">'
+       +`<div style="text-align:center;min-width:96px"><div style="font-size:44px;font-weight:800;line-height:1;color:${isaFaixa(avg)[1]}">${avg}</div><div style="color:var(--muted);font-size:12px;margin-top:5px">ISA médio</div></div>`
+       +'<div style="flex:1;min-width:300px"><div class="stack">'+ISA_KEYS.map(k=>`<i style="width:${cnt[k]/tot*100}%;background:${COL[k]}"></i>`).join('')+'</div>'
+       +'<div style="display:flex;gap:14px;margin-top:8px;font-size:12px;color:var(--muted);flex-wrap:wrap">'+ISA_KEYS.map(k=>`<span><b style="color:${COL[k]}">■</b> ${ISA_LABEL[k]} ${fmt(cnt[k])}</span>`).join('')+'</div></div></div>';
+      x+='<p class="sub" style="margin:10px 2px 0">Score por aluno (0–100): engajamento (recência) 35% · atualidade do treino 30% · saúde do contrato 25% · vínculo com professor 10%. Clique num aluno no CRM para ver os fatores. Pesos v1, a calibrar com histórico de perdas.</p></div>';
+      return x;
+    })();
     if(D.alunos && D.alunos.length){
       const alvo=crmBase().length, base=crmBaseFull().length, fora=base-alvo;
       h+='<div class="sec">Modalidade — público-alvo do App Treino</div>'+modPanel(crmBase())
@@ -670,6 +681,7 @@ window.DATA = /*__DATA__*/null;
       case 'fazTreino': return a.fazTreino===true?1:(a.fazTreino===false?0:-1);
       case 'treino': return a.treinoStatus==='vencido'?0:(a.treinoStatus==='emdia'?2:1);
       case 'recencia': return (a.recenciaDias==null?1e9:a.recenciaDias);
+      case 'isa': return isaScore(a);
       case 'usaApp': return a.usaApp===true?1:(a.usaApp===false?0:-1);
       default: return String(a[k]||'').toLowerCase();
     }
@@ -682,6 +694,7 @@ window.DATA = /*__DATA__*/null;
     if(state.crmProf!=='all')     A=A.filter(a=> String(a.professor||'—')===state.crmProf);
     if(state.crmTreino!=='all')   A=A.filter(a=> a.treinoStatus===state.crmTreino);
     if(state.crmRec!=='all')      A=A.filter(a=> state.crmRec==='rec' ? (a.recenciaDias!=null&&a.recenciaDias<=14) : recBucket(a)===state.crmRec);
+    if(state.crmIsa!=='all')      A=A.filter(a=> isaKey(isaScore(a))===state.crmIsa);
     if(state.crmContrato!=='all') A=A.filter(a=> contratoBucket(a.diasContrato)===state.crmContrato);
     const qq=(state.crmQ||'').trim().toLowerCase();
     if(qq) A=A.filter(a=>String(a.nome||'').toLowerCase().includes(qq)||String(a.email||'').toLowerCase().includes(qq));
@@ -702,14 +715,14 @@ window.DATA = /*__DATA__*/null;
     const showUnit = state.unit==='all';
     const S=state.crmSort, TH=(k,l)=>`<th class="sortable" data-k="${k}">${l}${_sarr(S,k)}</th>`;
     let h='<div class="tbl rtable"><div class="scroll"><table><thead><tr>'
-      +TH('nome','Aluno')+(showUnit?TH('unitNome','Unidade'):'')+TH('professor','Professor')+TH('modalidade','Modalidade')+TH('fazTreino','Faz treino')+TH('treino','Treino')+TH('usaApp','Usa o app')+TH('recencia','Últ. acesso')+TH('contrato','Contrato')+TH('faixa','Faixa')+TH('score','Score')
+      +TH('nome','Aluno')+(showUnit?TH('unitNome','Unidade'):'')+TH('professor','Professor')+TH('modalidade','Modalidade')+TH('fazTreino','Faz treino')+TH('treino','Treino')+TH('usaApp','Usa o app')+TH('recencia','Últ. acesso')+TH('contrato','Contrato')+TH('faixa','Faixa')+TH('isa','ISA')
       +'</tr></thead><tbody>';
-    if(!rows.length){ h+=`<tr><td colspan="${showUnit?9:8}"><div class="empty" style="border:none;padding:26px">Nenhum aluno para estes filtros. Tente ampliar a seleção.</div></td></tr>`; }
-    rows.forEach(a=>{ const f=FA[a.faixa]||['—','']; h+=`<tr>
+    if(!rows.length){ h+=`<tr><td colspan="${showUnit?11:10}"><div class="empty" style="border:none;padding:26px">Nenhum aluno para estes filtros. Tente ampliar a seleção.</div></td></tr>`; }
+    rows.forEach(a=>{ const f=FA[a.faixa]||['—','']; h+=`<tr class="click" data-mat="${esc(a.matricula)}">
       <td data-label="Aluno"><div class="aluno-cell">${avatar(a)}<div><div class="nm">${esc(a.nome)||'—'}</div><div class="ct">${esc(a.email||'')}${a.telefone?(a.email?' · ':'')+esc(a.telefone):''}</div></div></div></td>`
       +(showUnit?`<td data-label="Unidade" style="white-space:nowrap">${esc(a.unitNome)}</td>`:'')
       +`<td class="muted" data-label="Professor">${esc(a.professor)||'—'}${NAOPROF(a.professor)==='Sem Professor'?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${a.motivoSemProf?('▸ '+esc(a.motivoSemProf)):'<i>motivo não registrado</i>'}</div>`:''}</td><td data-label="Modalidade">${modPill(a.modalidade)}</td><td data-label="Faz treino">${fazPill(a.fazTreino)}</td><td data-label="Treino">${treinoPill(a.treinoStatus)}</td><td data-label="Usa o app">${appPill(a.usaApp)}</td><td data-label="Últ. acesso">${recPill(a)}</td><td data-label="Contrato">${contratoPill(a.diasContrato)}</td>
-      <td data-label="Faixa"><span class="pill ${f[1]}">${f[0]}</span></td><td data-label="Score">${scorePill(scoreAluno(a))}</td></tr>`; });
+      <td data-label="Faixa"><span class="pill ${f[1]}">${f[0]}</span></td><td data-label="ISA">${isaPill(a)}</td></tr>`; });
     h+='</tbody></table></div>';
     h+=`<div class="pager"><span style="color:var(--muted);font-size:12.5px">${fmt(A.length)} aluno(s) · página ${state.crmPage} de ${pages}</span>
       <span style="display:flex;gap:8px"><button class="pbtn" data-p="prev" ${state.crmPage<=1?'disabled':''}>‹ Anterior</button>
@@ -717,6 +730,7 @@ window.DATA = /*__DATA__*/null;
     box.innerHTML=h;
     box.querySelectorAll('.pbtn').forEach(b=>b.onclick=()=>{ state.crmPage+=(b.dataset.p==='next'?1:-1); renderCRMResults(); window.scrollTo({top:0,behavior:'smooth'}); });
     box.querySelectorAll('th.sortable').forEach(t=>t.onclick=()=>{ const k=t.dataset.k; if(state.crmSort.k===k) state.crmSort.dir*=-1; else {state.crmSort.k=k;state.crmSort.dir=1;} state.crmPage=1; renderCRMResults(); });
+    box.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>alunoDrawer(tr.dataset.mat));
   }
   function renderCRM(){
     const el=document.getElementById('v-crm');
@@ -757,7 +771,8 @@ window.DATA = /*__DATA__*/null;
       +_fld('Faz treino',_sel('crmPub',[['all','Todos'],['sim','Faz treino'],['nao','Não faz']],state.crmPub))
       +_fld('Treino',_sel('crmTreino',[['all','Todos'],['emdia','Em dia'],['vencido','Vencido']],state.crmTreino))
       +_fld('Recência',_sel('crmRec',[['all','Todas'],['rec','Recente ≤14d'],['15-30','15–30d'],['31-60','31–60d'],['60+','60+d'],['semreg','Sem registro']],state.crmRec))
-      +'</div><p class="sub" style="margin:0 2px 4px">Clique no cabeçalho de qualquer coluna para ordenar.</p>';
+      +_fld('Saúde (ISA)',_sel('crmIsa',[['all','Todas'],['sau','Saudável'],['ate','Atenção'],['rmo','Risco moderado'],['ralto','Risco alto'],['crit','Crítico']],state.crmIsa))
+      +'</div><p class="sub" style="margin:0 2px 4px">Clique numa linha para ver o Índice de Saúde (ISA) do aluno · no cabeçalho para ordenar.</p>';
     h+='<div id="crmResults" style="margin-top:8px"></div>';
     el.innerHTML=h;
     el.querySelectorAll('.fsel').forEach(s=>s.onchange=()=>{ const id=s.dataset.sel, v=s.value;
@@ -780,6 +795,46 @@ window.DATA = /*__DATA__*/null;
   function scoreCol(v){return v>=70?'#3f8a52':v>=45?'#a97c00':'#b53434';}
   function scoreBg(v){return v>=70?'#E7F4EB':v>=45?'#FDF3DC':'#FBE8E8';}
   function scorePill(v){return `<span class="pill" style="background:${scoreBg(v)};color:${scoreCol(v)}">${v}</span>`;}
+  // ---------- Índice de Saúde do Aluno (ISA) — P0-3 (pesos v1, a calibrar com histórico de perdas) ----------
+  const ISA_W={eng:0.35,tr:0.30,ct:0.25,vin:0.10};
+  function isaSub(a){
+    const d=a.recenciaDias;
+    const eng = d==null ? (a.usaApp===true?55:20) : (d<=7?100:d<=14?80:d<=30?55:d<=60?30:10);
+    const tr  = a.treinoStatus==='emdia'?100:(a.treinoStatus==='vencido'?35:10);
+    const dc=a.diasContrato;
+    const ct  = dc==null?75:(dc<0?15:dc<=30?55:dc<=90?82:100);
+    const np=NAOPROF(a.professor);
+    const vin = (a.fazTreino===true && a.professor && !np)?100:(np==='Sem Professor'?25:(a.fazTreino===true?85:40));
+    return {eng,tr,ct,vin};
+  }
+  function isaScore(a){const s=isaSub(a);return Math.round(s.eng*ISA_W.eng+s.tr*ISA_W.tr+s.ct*ISA_W.ct+s.vin*ISA_W.vin);}
+  function isaFaixa(v){return v>=80?['Saudável','#3f8a52','#E7F4EB']:v>=60?['Atenção','#a97c00','#FDF3DC']:v>=40?['Risco moderado','#B5731A','#FBE8DC']:v>=20?['Risco alto','#b53434','#FBE8E8']:['Crítico','#8B1A1A','#F3D2D2'];}
+  const ISA_KEYS=['sau','ate','rmo','ralto','crit'];
+  function isaKey(v){return v>=80?'sau':v>=60?'ate':v>=40?'rmo':v>=20?'ralto':'crit';}
+  const ISA_LABEL={sau:'Saudável',ate:'Atenção',rmo:'Risco moderado',ralto:'Risco alto',crit:'Crítico'};
+  function isaPill(a){const v=isaScore(a),f=isaFaixa(v);return `<span class="pill" style="background:${f[2]};color:${f[1]}" title="${f[0]}">${v}</span>`;}
+  const ISA_DIM=[['eng','Engajamento (recência)'],['tr','Atualidade do treino'],['ct','Saúde do contrato'],['vin','Vínculo com professor']];
+  function isaAcao(a){const s=isaSub(a);const low=['eng','tr','ct','vin'].reduce((m,k)=>s[k]<s[m]?k:m,'eng');
+    return low==='eng'?'Reengajar no app / resgate':low==='tr'?'Renovar ou prescrever treino':low==='ct'?'Contato de renovação':'Vincular a um professor';}
+  function alunoDrawer(mat){
+    const a=(D.alunos||[]).find(x=>String(x.matricula)===String(mat)); if(!a) return;
+    const v=isaScore(a),f=isaFaixa(v),s=isaSub(a);
+    let h=`<button class="pmx" onclick="document.getElementById('pmodal').classList.remove('on')">&times;</button>`;
+    h+=`<div style="display:flex;align-items:center;gap:12px;margin:0 0 6px"><span class="av">${iniciais(a.nome)}</span><div style="flex:1"><h3 style="margin:0 0 3px;font-size:16px">${esc(a.nome)}</h3><p class="sub" style="margin:0">${uName(a.unit)} · ${modPill(a.modalidade)} · ${esc(a.professor)||'sem professor'}</p></div><div style="text-align:right"><div style="font-size:34px;font-weight:800;line-height:1;color:${f[1]}">${v}</div><span class="pill" style="background:${f[2]};color:${f[1]}">${f[0]}</span></div></div>`;
+    h+='<div style="font-size:12px;color:var(--muted);margin:14px 2px 6px">Por que este score (0–100 por dimensão)</div>';
+    h+=ISA_DIM.map(dm=>{const val=s[dm[0]];const c=val>=70?'#5BAD6F':val>=40?'#F2C94C':'#D64545';return `<div style="display:flex;align-items:center;gap:10px;margin:6px 0"><span style="width:172px;font-size:12px;color:var(--muted)">${dm[1]} <span style="font-size:10px">(${Math.round(ISA_W[dm[0]]*100)}%)</span></span><div class="bar"><i style="width:${val}%;background:${c}"></i></div><span style="width:34px;text-align:right;font-size:12px;font-weight:700">${val}</span></div>`;}).join('');
+    h+=`<div class="urow" style="margin-top:14px"><span><b>Ação sugerida</b></span><b style="color:${f[1]}">${isaAcao(a)}</b></div>`;
+    h+=`<div style="font-size:12px;color:var(--muted);margin-top:14px;margin-bottom:4px">Dados do aluno</div><div class="tbl"><table style="width:100%;font-size:12.5px"><tbody>
+      <tr><td class="muted" style="padding:4px 0">Último acesso ao treino</td><td style="text-align:right">${a.recenciaDias!=null?a.recenciaDias+' dias atrás':'<span style="color:#999">sem registro</span>'}</td></tr>
+      <tr><td class="muted" style="padding:4px 0">Treino</td><td style="text-align:right">${treinoPill(a.treinoStatus)}</td></tr>
+      <tr><td class="muted" style="padding:4px 0">Usa o app (Pacto)</td><td style="text-align:right">${appPill(a.usaApp)}</td></tr>
+      <tr><td class="muted" style="padding:4px 0">Contrato</td><td style="text-align:right">${contratoPill(a.diasContrato)}</td></tr>
+      <tr><td class="muted" style="padding:4px 0">Contato</td><td style="text-align:right">${esc(a.email||'—')}${a.telefone?' · '+esc(a.telefone):''}</td></tr>
+    </tbody></table></div>`;
+    h+='<p class="sub" style="margin:12px 2px 0">ISA v1 — pesos ilustrativos (engajamento 35% · treino 30% · contrato 25% · vínculo 10%), a calibrar com o histórico de perdas. Frequência presencial e avaliação por aluno entram quando integradas.</p>';
+    document.getElementById('pmodalc').innerHTML=h;
+    document.getElementById('pmodal').classList.add('on');
+  }
   const INIS = {
     reativar: {t:'Reativar contrato',    ac:'Contato de retenção / renovação',       c:'#D64545'},
     retencao: {t:'Retenção (em risco)',  ac:'Ligar + reengajar no app',              c:'#D64545'},
