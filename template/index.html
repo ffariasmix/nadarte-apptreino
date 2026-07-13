@@ -330,6 +330,18 @@ window.DATA = /*__DATA__*/null;
         +`<p class="sub" style="margin:8px 2px 0">Considera só o <b>público-alvo</b> = planos com <b>Fitness</b> (Fitness · Ambos Água+Fitness · Ambos Fitness+Luta · Ambos Água+Fitness+Luta): <b>${fmt(alvo)}</b> de ${fmt(base)} ativos. Fora do recorte: <b>${fmt(fora)}</b> (Água/Luta só, Outros) — não entram nas métricas do app.</p>`;
     }
     const aptaUnit=uid=>{const b=(D.alunos||[]).filter(a=>a.unit===uid&&ELEG(a));const ap=b.filter(a=>a.usaApp===true).length;return b.length? ap/b.length*100 : 0;};
+    // Funil de engajamento (P0-2) — monotônico, fonte única (programa + recência)
+    (function(){const apt=B.length||1;
+      const F=[['Aptos ao App Treino',B.length],
+        ['Com programa de treino',B.filter(a=>a.treinoStatus!=null).length],
+        ['Já acessaram o treino',B.filter(a=>a.recenciaDias!=null).length],
+        ['Acesso ≤30 dias',B.filter(a=>a.recenciaDias!=null&&a.recenciaDias<=30).length],
+        ['Acesso ≤14 dias',B.filter(a=>a.recenciaDias!=null&&a.recenciaDias<=14).length],
+        ['Acesso ≤7 dias · ativos',B.filter(a=>a.recenciaDias!=null&&a.recenciaDias<=7).length]];
+      h+='<div class="sec">Funil de engajamento com o treino</div><div class="panel"><p class="sub" style="margin:0 2px 10px">Base apta · de elegível a ativo na última semana. Cada degrau é subconjunto do anterior.</p>';
+      h+=F.map((s,i)=>{const p=Math.round(s[1]/apt*100);const col=i<2?'#7A5AA8':i<4?'#3E6DAA':'#5BAD6F';
+        return `<div style="display:flex;align-items:center;gap:10px;margin:6px 0"><span style="width:180px;font-size:12.5px;color:var(--muted)">${s[0]}</span><div class="bar" style="max-width:360px"><i style="width:${p}%;background:${col}"></i></div><span style="width:110px;text-align:right;font-size:12px"><b>${fmt(s[1])}</b> <span style="color:var(--muted);font-size:11px">(${p}%)</span></span></div>`;}).join('');
+      h+='<p class="sub" style="margin:10px 2px 0">O KPI <b>"Uso do App"</b> usa o marcador estrito da Pacto (<code>usaApp</code>); o funil usa o <b>último acesso ao treino</b> (<code>dataUltimoacesso</code>), mais amplo — por isso os números diferem.</p></div>';})();
     h+='<div class="sec">Gráficos</div><div class="grid2">';
     h+='<div class="panel"><h3>Uso do app por unidade</h3><p class="sub">% da base apta (Fitness) que usa o App Treino</p>'
        +hbars(ALL.map(u=>({label:u.nome,value:aptaUnit(u.id)})),'#7A5AA8',v=>pct(v))+'</div>';
