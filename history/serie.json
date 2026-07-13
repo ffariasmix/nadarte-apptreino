@@ -610,20 +610,20 @@
   "rede": {
    "usoApp": 41.0,
    "emDiaPct": 63.5,
-   "vencidos": 875,
+   "vencidos": 874,
    "avalVencidas": 501,
    "nota": 4.93,
-   "execSemana": 6845,
-   "ativos": 5004,
+   "execSemana": 6876,
+   "ativos": 4997,
    "engajado": 1086,
-   "morno": 3475,
-   "risco": 443,
+   "morno": 3470,
+   "risco": 441,
    "semdado": 0,
-   "appSim": 1205,
-   "appNao": 3799,
+   "appSim": 1206,
+   "appNao": 3791,
    "appFalha": 0,
-   "fazTreino": 3426,
-   "naoFazTreino": 1462
+   "fazTreino": 3414,
+   "naoFazTreino": 1474
   },
   "unidades": [
    {
