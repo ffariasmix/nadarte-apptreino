@@ -198,7 +198,7 @@ window.DATA = /*__DATA__*/null;
   const N = v => Number(v)||0;
   if(D.gerado_em){ try{ document.getElementById('asof').textContent = new Date(D.gerado_em).toLocaleString('pt-BR'); }catch(e){} }
 
-  let state = {unit:'all', tab:'geral', crmFaixa:'all', crmPub:'all', crmMod:'all', crmProf:'all', crmContrato:'all', crmTreino:'all', crmQ:'', crmPage:1, crmSort:{k:null,dir:1}, profSort:{k:null,dir:1}, scoreIni:'all', scoreProf:'all', scoreContrato:'all', scoreQ:'', scorePage:1, scoreSort:{k:null,dir:1}, histPeriod:'dia'};
+  let state = {unit:'all', tab:'geral', crmFaixa:'all', crmPub:'all', crmMod:'all', crmProf:'all', crmContrato:'all', crmTreino:'all', crmRec:'all', crmQ:'', crmPage:1, crmSort:{k:null,dir:1}, profSort:{k:null,dir:1}, scoreIni:'all', scoreProf:'all', scoreContrato:'all', scoreQ:'', scorePage:1, scoreSort:{k:null,dir:1}, histPeriod:'dia'};
   const sel = () => state.unit==='all' ? ALL : ALL.filter(u=>u.id===state.unit);
   const sum = k => sel().reduce((a,u)=>a+N(u[k]),0);
   const wavg = (k,w) => { let n=0,d=0; sel().forEach(u=>{const ww=N(u[w]); if(u[k]!=null){n+=Number(u[k])*ww; d+=ww;}}); return d?n/d:null; };
@@ -343,6 +343,10 @@ window.DATA = /*__DATA__*/null;
      h+='<div class="panel"><h3>Alunos que treinaram por dia</h3><p class="sub">frequência real (acessos) · média por dia da semana · '+(state.unit==='all'?'rede':uName(state.unit))+' · '+fmt(execSem)+'/semana típica</p>'
        +execDia.map(x=>`<div style="display:flex;align-items:center;gap:10px;margin:5px 0"><span style="width:34px;font-size:12px;color:var(--muted)">${DLAB[x.dia]}</span><div class="bar"><i style="width:${x.v/mx*100}%;background:#5BAD6F"></i></div><span style="width:100px;text-align:right;font-size:12px"><b>${fmt(x.v)}</b> <span style="color:var(--muted);font-size:11px">(${pct(x.v/tsem*100)} da sem.)</span></span></div>`).join('')
        +'</div>';})();
+    h+='<div class="panel"><h3>Recência de uso do App</h3><p class="sub">base apta · dias desde o último acesso registrado</p>'
+       +(function(){const bk={};REC_ORDER.forEach(k=>bk[k]=0);B.forEach(a=>{bk[recBucket(a)]++;});const mx=Math.max(1,...REC_ORDER.map(k=>bk[k]));const tot=B.length||1;
+         return REC_ORDER.map(k=>`<div style="display:flex;align-items:center;gap:10px;margin:5px 0"><span style="width:92px;font-size:12px;color:var(--muted)">${REC_LABEL[k]}</span><div class="bar"><i style="width:${bk[k]/mx*100}%;background:${REC_COLOR[k]}"></i></div><span style="width:96px;text-align:right;font-size:12px"><b>${fmt(bk[k])}</b> <span style="color:var(--muted);font-size:11px">(${pct(bk[k]/tot*100)})</span></span></div>`).join('');})()
+       +'<p class="sub" style="margin:8px 2px 0">"Sem registro" = aluno sem acesso registrado nas listas de treino (ainda não usou ou nunca ativou).</p></div>';
     h+='<div class="panel"><h3>Situação das fichas</h3><p class="sub">base apta · na seleção atual</p>'
        +donut([{label:'Em dia',value:emDiaB,color:'#5BAD6F'},{label:'Vencidas',value:vencB,color:'#D64545'}])+'</div>';
     const vencUnit=uid=>(D.alunos||[]).filter(a=>a.unit===uid&&ELEG(a)&&a.treinoStatus==='vencido').length;
@@ -477,6 +481,7 @@ window.DATA = /*__DATA__*/null;
           <tr><td><b>Carteira por aluno (CRM)</b></td><td><code>/clientes/simples</code> (nome, contrato, contato)</td></tr>
           <tr><td><b>Uso do app por aluno</b></td><td><code>/psec/alunos/alunoApp?cliente=</code> → <code>usaApp</code></td></tr>
           <tr><td><b>Treino em dia por aluno</b></td><td><code>/psec/treino-bi/alunos-treino-em-dia</code> / <code>-vencido</code> (0-indexado, cruzado por matrícula)</td></tr>
+          <tr><td><b>Recência de uso (últ. acesso)</b></td><td><code>alunos-treino-*.dataUltimoacesso</code> → dias desde o último acesso registrado (por aluno)</td></tr>
           <tr><td><b>Modalidade (7 baldes)</b></td><td><code>/v1/contrato/matricula/{matrícula}.descricao</code> → classificador</td></tr>
           <tr><td><b>Foto do aluno / professor</b></td><td><code>/v1/cliente.pessoa.fotoUrl</code> · <code>bi-professores-vinculos.imageUri</code></td></tr>
           <tr><td><b>Motivo "Sem Professor"</b></td><td><code>/clientes/{matrícula}/dados-pessoais.objecao</code> (registrado pela equipe)</td></tr>
@@ -634,6 +639,12 @@ window.DATA = /*__DATA__*/null;
   const ELEG = a => /Fitness/i.test(String(a && a.modalidade || ''));
   const crmBaseFull = () => (D.alunos||[]).filter(a=> state.unit==='all' || a.unit===state.unit);
   const crmBase = () => crmBaseFull().filter(ELEG);   // base das métricas do app = público-alvo
+  // Recência de uso do App (P0) — dias desde o último acesso registrado (dataUltimoacesso)
+  const REC_ORDER=['0-7','8-14','15-30','31-60','60+','semreg'];
+  const REC_LABEL={'0-7':'0–7 dias','8-14':'8–14 dias','15-30':'15–30 dias','31-60':'31–60 dias','60+':'60+ dias','semreg':'Sem registro'};
+  const REC_COLOR={'0-7':'#5BAD6F','8-14':'#8FBF5B','15-30':'#F2C94C','31-60':'#E8934C','60+':'#D64545','semreg':'#9B96A0'};
+  function recBucket(a){ const d=a&&a.recenciaDias; if(d==null) return 'semreg'; if(d<=7)return '0-7'; if(d<=14)return '8-14'; if(d<=30)return '15-30'; if(d<=60)return '31-60'; return '60+'; }
+  function recPill(a){ const d=a&&a.recenciaDias; if(d==null) return '<span class="pill" style="background:#EEE;color:#999">—</span>'; const k=recBucket(a),c=REC_COLOR[k]; return `<span class="pill" style="background:${c}22;color:${c}">${d}d</span>`; }
   const contratoBucket = d => d==null? 'vigente' : (d<0?'vencido':(d<=30?'vencendo':'vigente'));
   const _fld = (label,ctrl) => `<div class="fld"><label>${label}</label>${ctrl}</div>`;
   const _sel = (id,opts,cur) => `<select class="fsel" data-sel="${id}">`+opts.map(o=>`<option value="${esc(String(o[0]))}" ${String(o[0])===String(cur)?'selected':''}>${esc(o[1])}</option>`).join('')+`</select>`;
@@ -646,6 +657,7 @@ window.DATA = /*__DATA__*/null;
       case 'modalidade': return MOD_ORDER.indexOf(modKey(a));
       case 'fazTreino': return a.fazTreino===true?1:(a.fazTreino===false?0:-1);
       case 'treino': return a.treinoStatus==='vencido'?0:(a.treinoStatus==='emdia'?2:1);
+      case 'recencia': return (a.recenciaDias==null?1e9:a.recenciaDias);
       case 'usaApp': return a.usaApp===true?1:(a.usaApp===false?0:-1);
       default: return String(a[k]||'').toLowerCase();
     }
@@ -657,6 +669,7 @@ window.DATA = /*__DATA__*/null;
     if(state.crmMod!=='all')      A=A.filter(a=> modKey(a)===state.crmMod);
     if(state.crmProf!=='all')     A=A.filter(a=> String(a.professor||'—')===state.crmProf);
     if(state.crmTreino!=='all')   A=A.filter(a=> a.treinoStatus===state.crmTreino);
+    if(state.crmRec!=='all')      A=A.filter(a=> state.crmRec==='rec' ? (a.recenciaDias!=null&&a.recenciaDias<=14) : recBucket(a)===state.crmRec);
     if(state.crmContrato!=='all') A=A.filter(a=> contratoBucket(a.diasContrato)===state.crmContrato);
     const qq=(state.crmQ||'').trim().toLowerCase();
     if(qq) A=A.filter(a=>String(a.nome||'').toLowerCase().includes(qq)||String(a.email||'').toLowerCase().includes(qq));
@@ -677,13 +690,13 @@ window.DATA = /*__DATA__*/null;
     const showUnit = state.unit==='all';
     const S=state.crmSort, TH=(k,l)=>`<th class="sortable" data-k="${k}">${l}${_sarr(S,k)}</th>`;
     let h='<div class="tbl rtable"><div class="scroll"><table><thead><tr>'
-      +TH('nome','Aluno')+(showUnit?TH('unitNome','Unidade'):'')+TH('professor','Professor')+TH('modalidade','Modalidade')+TH('fazTreino','Faz treino')+TH('treino','Treino')+TH('usaApp','Usa o app')+TH('contrato','Contrato')+TH('faixa','Faixa')+TH('score','Score')
+      +TH('nome','Aluno')+(showUnit?TH('unitNome','Unidade'):'')+TH('professor','Professor')+TH('modalidade','Modalidade')+TH('fazTreino','Faz treino')+TH('treino','Treino')+TH('usaApp','Usa o app')+TH('recencia','Últ. acesso')+TH('contrato','Contrato')+TH('faixa','Faixa')+TH('score','Score')
       +'</tr></thead><tbody>';
     if(!rows.length){ h+=`<tr><td colspan="${showUnit?9:8}"><div class="empty" style="border:none;padding:26px">Nenhum aluno para estes filtros. Tente ampliar a seleção.</div></td></tr>`; }
     rows.forEach(a=>{ const f=FA[a.faixa]||['—','']; h+=`<tr>
       <td data-label="Aluno"><div class="aluno-cell">${avatar(a)}<div><div class="nm">${esc(a.nome)||'—'}</div><div class="ct">${esc(a.email||'')}${a.telefone?(a.email?' · ':'')+esc(a.telefone):''}</div></div></div></td>`
       +(showUnit?`<td data-label="Unidade" style="white-space:nowrap">${esc(a.unitNome)}</td>`:'')
-      +`<td class="muted" data-label="Professor">${esc(a.professor)||'—'}${NAOPROF(a.professor)==='Sem Professor'?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${a.motivoSemProf?('▸ '+esc(a.motivoSemProf)):'<i>motivo não registrado</i>'}</div>`:''}</td><td data-label="Modalidade">${modPill(a.modalidade)}</td><td data-label="Faz treino">${fazPill(a.fazTreino)}</td><td data-label="Treino">${treinoPill(a.treinoStatus)}</td><td data-label="Usa o app">${appPill(a.usaApp)}</td><td data-label="Contrato">${contratoPill(a.diasContrato)}</td>
+      +`<td class="muted" data-label="Professor">${esc(a.professor)||'—'}${NAOPROF(a.professor)==='Sem Professor'?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${a.motivoSemProf?('▸ '+esc(a.motivoSemProf)):'<i>motivo não registrado</i>'}</div>`:''}</td><td data-label="Modalidade">${modPill(a.modalidade)}</td><td data-label="Faz treino">${fazPill(a.fazTreino)}</td><td data-label="Treino">${treinoPill(a.treinoStatus)}</td><td data-label="Usa o app">${appPill(a.usaApp)}</td><td data-label="Últ. acesso">${recPill(a)}</td><td data-label="Contrato">${contratoPill(a.diasContrato)}</td>
       <td data-label="Faixa"><span class="pill ${f[1]}">${f[0]}</span></td><td data-label="Score">${scorePill(scoreAluno(a))}</td></tr>`; });
     h+='</tbody></table></div>';
     h+=`<div class="pager"><span style="color:var(--muted);font-size:12.5px">${fmt(A.length)} aluno(s) · página ${state.crmPage} de ${pages}</span>
@@ -731,6 +744,7 @@ window.DATA = /*__DATA__*/null;
       +_fld('Faixa',_sel('crmFaixa',[['all','Todas'],['engajado','Engajado'],['morno','Morno'],['risco','Em risco']],state.crmFaixa))
       +_fld('Faz treino',_sel('crmPub',[['all','Todos'],['sim','Faz treino'],['nao','Não faz']],state.crmPub))
       +_fld('Treino',_sel('crmTreino',[['all','Todos'],['emdia','Em dia'],['vencido','Vencido']],state.crmTreino))
+      +_fld('Recência',_sel('crmRec',[['all','Todas'],['rec','Recente ≤14d'],['15-30','15–30d'],['31-60','31–60d'],['60+','60+d'],['semreg','Sem registro']],state.crmRec))
       +'</div><p class="sub" style="margin:0 2px 4px">Clique no cabeçalho de qualquer coluna para ordenar.</p>';
     h+='<div id="crmResults" style="margin-top:8px"></div>';
     el.innerHTML=h;

@@ -350,9 +350,10 @@ def normmat(m):
 
 
 def treino_status_map(key):
-    """matricula(normalizada) -> 'emdia' | 'vencido' cruzando as listas por-aluno (cp=0 = unidade toda).
+    """matricula(normalizada) -> (status, ultimoAcessoMs) cruzando as listas por-aluno (cp=0 = unidade toda).
+    status = 'emdia' | 'vencido'. ultimoAcessoMs vem de dataUltimoacesso (P0 recencia de uso).
     Endpoints confirmados por probe: /psec/treino-bi/alunos-treino-{em-dia,vencido}/{cp}.
-    So usamos matricula (sem PII). Paginacao com trava anti-loop."""
+    So usamos matricula + data (sem PII). Paginacao com trava anti-loop."""
     out = {}
     for ep, status in (("alunos-treino-em-dia", "emdia"), ("alunos-treino-vencido", "vencido")):
         seen = -1
@@ -364,7 +365,7 @@ def treino_status_map(key):
             for it in items:
                 m = normmat(it.get("matricula"))
                 if m is not None:
-                    out[m] = status
+                    out[m] = (status, parse_date_ms(it.get("dataUltimoacesso")))
             if len(items) < 1000 or len(out) == seen:  # ultima pagina OU pagina nao avancou
                 break
             seen = len(out)
@@ -642,13 +643,18 @@ def main():
             ua, faz, pnome, pcod, foto, modal = app_res.get((uk, cid), (None, None, None, None, None, None))
             faixa = classifica(bool(ua), fim_ms) if ua is not None else "semdado"
             _mat = it.get("matricula")
-            treino_st = tstat.get(normmat(_mat)) if _mat is not None else None
+            _tsx = tstat.get(normmat(_mat)) if _mat is not None else None
+            treino_st = _tsx[0] if _tsx else None
+            _ult = _tsx[1] if _tsx else None
+            _recdias = round((NOW_MS - _ult) / 86400000.0) if _ult else None
             u_alunos.append({
                 "unit": uk, "unitNome": r["ulabel"],
                 "nome": it.get("nome"), "matricula": it.get("matricula"),
                 "foto": foto,   # pessoa.fotoUrl (via /v1/cliente)
                 "modalidade": modal,   # 7 baldes (via /v1/contrato/matricula)
                 "treinoStatus": treino_st,   # 'emdia' | 'vencido' | None (via listas por-aluno)
+                "ultimoAcesso": _ult,        # epoch ms do ultimo acesso (P0 recencia)
+                "recenciaDias": _recdias,    # dias desde o ultimo acesso (None = sem registro)
                 "motivoSemProf": motivo_res.get((uk, cid)),   # objecao (Bloco 02), so p/ 'Sem Professor'
                 "fazTreino": faz, "professor": pnome, "professorId": pcod,
                 "elegivel": faz,   # elegivel ao App Treino = faz treino (vinculo com prof. de treino)
