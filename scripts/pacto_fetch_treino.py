@@ -349,6 +349,29 @@ def normmat(m):
         return str(m).strip()
 
 
+PRESENCA_URL = os.environ.get("PRESENCA_URL",
+    "https://raw.githubusercontent.com/ffariasmix/nadarte-dashboard-automacao/main/presenca.json")
+
+
+def _pmh(m):
+    """Hash da matricula normalizada, IDENTICO ao emitido pelo dashboard Frequencia (sem prefixo)."""
+    return hashlib.sha256(str(m).encode("utf-8")).hexdigest()[:16]
+
+
+def fetch_presenca():
+    """Feed de PRESENCA por aluno (matricula hasheada) do Frequencia — ponte P1. Falha graciosamente."""
+    try:
+        req = urllib.request.Request(PRESENCA_URL, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            j = json.loads(r.read().decode("utf-8", "replace"))
+        al = j.get("alunos") if isinstance(j, dict) else None
+        print("[presenca] feed carregado: %d alunos (base %s)" % (len(al or {}), j.get("baseMonth", "?")), file=sys.stderr)
+        return al if isinstance(al, dict) else {}
+    except Exception as ex:
+        print("[presenca] feed indisponivel (%s) — seguindo sem presenca" % str(ex)[:80], file=sys.stderr)
+        return {}
+
+
 def treino_status_map(key):
     """matricula(normalizada) -> (status, ultimoAcessoMs) cruzando as listas por-aluno (cp=0 = unidade toda).
     status = 'emdia' | 'vencido'. ultimoAcessoMs vem de dataUltimoacesso (P0 recencia de uso).
@@ -632,6 +655,9 @@ def main():
         print("[modalidade] cache -> %d hit | %d fetch | %d stale | %d entradas salvas (TTL %dd)"
               % (src_cnt["cache"], src_cnt["fetch"], src_cnt["stale"], len(new_cache), MODAL_TTL), file=sys.stderr)
 
+    # ---- Ponte P1: presenca presencial por aluno (feed do Frequencia, matricula hasheada) ----
+    presenca = fetch_presenca()
+
     # ---- FASE 3: montar alunos + resumo por unidade ----
     for uk in sorted(resultados):
         r = resultados[uk]
@@ -647,6 +673,15 @@ def main():
             treino_st = _tsx[0] if _tsx else None
             _ult = _tsx[1] if _tsx else None
             _recdias = round((NOW_MS - _ult) / 86400000.0) if _ult else None
+            # presenca presencial (catraca) via ponte Frequencia
+            _pv = presenca.get(_pmh(normmat(_mat))) if _mat is not None else None
+            _pult = parse_date_ms(_pv.get("ult")) if isinstance(_pv, dict) else None
+            _presdias = round((NOW_MS - _pult) / 86400000.0) if _pult else None
+            _wk = _pv.get("wk") if isinstance(_pv, dict) else None
+            _prescai = None
+            if isinstance(_wk, list) and len(_wk) >= 8:
+                _rec4 = sum(x or 0 for x in _wk[-4:]); _prev4 = sum(x or 0 for x in _wk[-8:-4])
+                _prescai = bool((_rec4 == 0 and _prev4 > 0) or (_prev4 > 0 and _rec4 < _prev4 * 0.6))
             u_alunos.append({
                 "unit": uk, "unitNome": r["ulabel"],
                 "nome": it.get("nome"), "matricula": it.get("matricula"),
@@ -654,7 +689,9 @@ def main():
                 "modalidade": modal,   # 7 baldes (via /v1/contrato/matricula)
                 "treinoStatus": treino_st,   # 'emdia' | 'vencido' | None (via listas por-aluno)
                 "ultimoAcesso": _ult,        # epoch ms do ultimo acesso (P0 recencia)
-                "recenciaDias": _recdias,    # dias desde o ultimo acesso (None = sem registro)
+                "recenciaDias": _recdias,    # dias desde o ultimo acesso ao treino (None = sem registro)
+                "presencaDias": _presdias,   # dias desde a ultima presenca (catraca) — ponte Frequencia
+                "presencaCai": _prescai,     # tendencia de frequencia caindo (True/False/None)
                 "motivoSemProf": motivo_res.get((uk, cid)),   # objecao (Bloco 02), so p/ 'Sem Professor'
                 "fazTreino": faz, "professor": pnome, "professorId": pcod,
                 "elegivel": faz,   # elegivel ao App Treino = faz treino (vinculo com prof. de treino)

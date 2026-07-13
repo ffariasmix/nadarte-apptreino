@@ -198,7 +198,7 @@ window.DATA = /*__DATA__*/null;
   const N = v => Number(v)||0;
   if(D.gerado_em){ try{ document.getElementById('asof').textContent = new Date(D.gerado_em).toLocaleString('pt-BR'); }catch(e){} }
 
-  let state = {unit:'all', tab:'geral', crmFaixa:'all', crmPub:'all', crmMod:'all', crmProf:'all', crmContrato:'all', crmTreino:'all', crmRec:'all', crmIsa:'all', crmQ:'', crmPage:1, crmSort:{k:null,dir:1}, profSort:{k:null,dir:1}, scoreIni:'all', scoreProf:'all', scoreContrato:'all', scoreQ:'', scorePage:1, scoreSort:{k:null,dir:1}, histPeriod:'dia'};
+  let state = {unit:'all', tab:'geral', crmFaixa:'all', crmPub:'all', crmMod:'all', crmProf:'all', crmContrato:'all', crmTreino:'all', crmRec:'all', crmIsa:'all', crmComp:'all', crmQ:'', crmPage:1, crmSort:{k:null,dir:1}, profSort:{k:null,dir:1}, scoreIni:'all', scoreProf:'all', scoreContrato:'all', scoreQ:'', scorePage:1, scoreSort:{k:null,dir:1}, histPeriod:'dia'};
   const sel = () => state.unit==='all' ? ALL : ALL.filter(u=>u.id===state.unit);
   const sum = k => sel().reduce((a,u)=>a+N(u[k]),0);
   const wavg = (k,w) => { let n=0,d=0; sel().forEach(u=>{const ww=N(u[w]); if(u[k]!=null){n+=Number(u[k])*ww; d+=ww;}}); return d?n/d:null; };
@@ -332,7 +332,9 @@ window.DATA = /*__DATA__*/null;
        +`<div style="text-align:center;min-width:96px"><div style="font-size:44px;font-weight:800;line-height:1;color:${isaFaixa(avg)[1]}">${avg}</div><div style="color:var(--muted);font-size:12px;margin-top:5px">ISA médio</div></div>`
        +'<div style="flex:1;min-width:300px"><div class="stack">'+ISA_KEYS.map(k=>`<i style="width:${cnt[k]/tot*100}%;background:${COL[k]}"></i>`).join('')+'</div>'
        +'<div style="display:flex;gap:14px;margin-top:8px;font-size:12px;color:var(--muted);flex-wrap:wrap">'+ISA_KEYS.map(k=>`<span><b style="color:${COL[k]}">■</b> ${ISA_LABEL[k]} ${fmt(cnt[k])}</span>`).join('')+'</div></div></div>';
-      x+='<p class="sub" style="margin:10px 2px 0">Score por aluno (0–100): engajamento (recência) 35% · atualidade do treino 30% · saúde do contrato 25% · vínculo com professor 10%. Clique num aluno no CRM para ver os fatores. Pesos v1, a calibrar com histórico de perdas.</p></div>';
+      const comp=B.filter(riscoComposto).length, temPres=B.some(a=>a.presencaDias!=null);
+      if(temPres) x+=`<div class="urow" style="margin-top:10px"><span><b style="color:#D64545">⚠ Risco composto</b> (presença↓ + uso↓)</span><b style="color:#D64545">${fmt(comp)}</b></div>`;
+      x+='<p class="sub" style="margin:10px 2px 0">Score por aluno (0–100). Com presença (ponte Frequência): presença 25% · engajamento app 20% · treino 25% · contrato 20% · vínculo 10%. Sem presença: engajamento 35% · treino 30% · contrato 25% · vínculo 10%. Clique num aluno no CRM para ver os fatores. Pesos v1, a calibrar com histórico de perdas.</p></div>';
       return x;
     })();
     if(D.alunos && D.alunos.length){
@@ -505,6 +507,7 @@ window.DATA = /*__DATA__*/null;
           <tr><td><b>Uso do app por aluno</b></td><td><code>/psec/alunos/alunoApp?cliente=</code> → <code>usaApp</code></td></tr>
           <tr><td><b>Treino em dia por aluno</b></td><td><code>/psec/treino-bi/alunos-treino-em-dia</code> / <code>-vencido</code> (0-indexado, cruzado por matrícula)</td></tr>
           <tr><td><b>Recência de uso (últ. acesso)</b></td><td><code>alunos-treino-*.dataUltimoacesso</code> → dias desde o último acesso registrado (por aluno)</td></tr>
+          <tr><td><b>Presença (catraca) — ponte</b></td><td>feed <code>presenca.json</code> do dashboard Frequência (matrícula hasheada, sem PII) → última visita + tendência semanal</td></tr>
           <tr><td><b>Modalidade (7 baldes)</b></td><td><code>/v1/contrato/matricula/{matrícula}.descricao</code> → classificador</td></tr>
           <tr><td><b>Foto do aluno / professor</b></td><td><code>/v1/cliente.pessoa.fotoUrl</code> · <code>bi-professores-vinculos.imageUri</code></td></tr>
           <tr><td><b>Motivo "Sem Professor"</b></td><td><code>/clientes/{matrícula}/dados-pessoais.objecao</code> (registrado pela equipe)</td></tr>
@@ -695,6 +698,7 @@ window.DATA = /*__DATA__*/null;
     if(state.crmTreino!=='all')   A=A.filter(a=> a.treinoStatus===state.crmTreino);
     if(state.crmRec!=='all')      A=A.filter(a=> state.crmRec==='rec' ? (a.recenciaDias!=null&&a.recenciaDias<=14) : recBucket(a)===state.crmRec);
     if(state.crmIsa!=='all')      A=A.filter(a=> isaKey(isaScore(a))===state.crmIsa);
+    if(state.crmComp==='sim')     A=A.filter(a=> riscoComposto(a));
     if(state.crmContrato!=='all') A=A.filter(a=> contratoBucket(a.diasContrato)===state.crmContrato);
     const qq=(state.crmQ||'').trim().toLowerCase();
     if(qq) A=A.filter(a=>String(a.nome||'').toLowerCase().includes(qq)||String(a.email||'').toLowerCase().includes(qq));
@@ -772,6 +776,7 @@ window.DATA = /*__DATA__*/null;
       +_fld('Treino',_sel('crmTreino',[['all','Todos'],['emdia','Em dia'],['vencido','Vencido']],state.crmTreino))
       +_fld('Recência',_sel('crmRec',[['all','Todas'],['rec','Recente ≤14d'],['15-30','15–30d'],['31-60','31–60d'],['60+','60+d'],['semreg','Sem registro']],state.crmRec))
       +_fld('Saúde (ISA)',_sel('crmIsa',[['all','Todas'],['sau','Saudável'],['ate','Atenção'],['rmo','Risco moderado'],['ralto','Risco alto'],['crit','Crítico']],state.crmIsa))
+      +_fld('Risco composto',_sel('crmComp',[['all','Todos'],['sim','presença↓ + uso↓']],state.crmComp))
       +'</div><p class="sub" style="margin:0 2px 4px">Clique numa linha para ver o Índice de Saúde (ISA) do aluno · no cabeçalho para ordenar.</p>';
     h+='<div id="crmResults" style="margin-top:8px"></div>';
     el.innerHTML=h;
@@ -796,7 +801,9 @@ window.DATA = /*__DATA__*/null;
   function scoreBg(v){return v>=70?'#E7F4EB':v>=45?'#FDF3DC':'#FBE8E8';}
   function scorePill(v){return `<span class="pill" style="background:${scoreBg(v)};color:${scoreCol(v)}">${v}</span>`;}
   // ---------- Índice de Saúde do Aluno (ISA) — P0-3 (pesos v1, a calibrar com histórico de perdas) ----------
-  const ISA_W={eng:0.35,tr:0.30,ct:0.25,vin:0.10};
+  const ISA_W4={eng:0.35,tr:0.30,ct:0.25,vin:0.10};                 // sem presença
+  const ISA_W5={pres:0.25,eng:0.20,tr:0.25,ct:0.20,vin:0.10};       // com presença (ponte Frequência)
+  function isaWeights(a){ return a.presencaDias!=null?ISA_W5:ISA_W4; }
   function isaSub(a){
     const d=a.recenciaDias;
     const eng = d==null ? (a.usaApp===true?55:20) : (d<=7?100:d<=14?80:d<=30?55:d<=60?30:10);
@@ -805,27 +812,34 @@ window.DATA = /*__DATA__*/null;
     const ct  = dc==null?75:(dc<0?15:dc<=30?55:dc<=90?82:100);
     const np=NAOPROF(a.professor);
     const vin = (a.fazTreino===true && a.professor && !np)?100:(np==='Sem Professor'?25:(a.fazTreino===true?85:40));
-    return {eng,tr,ct,vin};
+    const pd=a.presencaDias; let pres=null;
+    if(pd!=null){ pres=(pd<=7?100:pd<=14?80:pd<=30?50:pd<=60?25:8); if(a.presencaCai===true) pres=Math.max(0,pres-20); }
+    return {pres,eng,tr,ct,vin};
   }
-  function isaScore(a){const s=isaSub(a);return Math.round(s.eng*ISA_W.eng+s.tr*ISA_W.tr+s.ct*ISA_W.ct+s.vin*ISA_W.vin);}
+  function isaScore(a){const s=isaSub(a),w=isaWeights(a);let v=0;for(const k in w)v+=(s[k]||0)*w[k];return Math.round(v);}
+  // risco composto — a maior alavanca de churn: presença caindo/ausente E app parado
+  function riscoComposto(a){ return (a.presencaCai===true || (a.presencaDias!=null&&a.presencaDias>=15)) && (a.recenciaDias!=null&&a.recenciaDias>=15); }
   function isaFaixa(v){return v>=80?['Saudável','#3f8a52','#E7F4EB']:v>=60?['Atenção','#a97c00','#FDF3DC']:v>=40?['Risco moderado','#B5731A','#FBE8DC']:v>=20?['Risco alto','#b53434','#FBE8E8']:['Crítico','#8B1A1A','#F3D2D2'];}
   const ISA_KEYS=['sau','ate','rmo','ralto','crit'];
   function isaKey(v){return v>=80?'sau':v>=60?'ate':v>=40?'rmo':v>=20?'ralto':'crit';}
   const ISA_LABEL={sau:'Saudável',ate:'Atenção',rmo:'Risco moderado',ralto:'Risco alto',crit:'Crítico'};
   function isaPill(a){const v=isaScore(a),f=isaFaixa(v);return `<span class="pill" style="background:${f[2]};color:${f[1]}" title="${f[0]}">${v}</span>`;}
-  const ISA_DIM=[['eng','Engajamento (recência)'],['tr','Atualidade do treino'],['ct','Saúde do contrato'],['vin','Vínculo com professor']];
-  function isaAcao(a){const s=isaSub(a);const low=['eng','tr','ct','vin'].reduce((m,k)=>s[k]<s[m]?k:m,'eng');
-    return low==='eng'?'Reengajar no app / resgate':low==='tr'?'Renovar ou prescrever treino':low==='ct'?'Contato de renovação':'Vincular a um professor';}
+  const ISA_DIMLBL={pres:'Presença (catraca)',eng:'Engajamento (app)',tr:'Atualidade do treino',ct:'Saúde do contrato',vin:'Vínculo com professor'};
+  function isaAcao(a){const s=isaSub(a),w=isaWeights(a);const low=Object.keys(w).reduce((m,k)=>((s[k]||0)<(s[m]||0)?k:m),Object.keys(w)[0]);
+    return low==='pres'?'Resgate presencial — trazer de volta à academia':low==='eng'?'Reengajar no app / resgate':low==='tr'?'Renovar ou prescrever treino':low==='ct'?'Contato de renovação':'Vincular a um professor';}
   function alunoDrawer(mat){
     const a=(D.alunos||[]).find(x=>String(x.matricula)===String(mat)); if(!a) return;
     const v=isaScore(a),f=isaFaixa(v),s=isaSub(a);
     let h=`<button class="pmx" onclick="document.getElementById('pmodal').classList.remove('on')">&times;</button>`;
     h+=`<div style="display:flex;align-items:center;gap:12px;margin:0 0 6px"><span class="av">${iniciais(a.nome)}</span><div style="flex:1"><h3 style="margin:0 0 3px;font-size:16px">${esc(a.nome)}</h3><p class="sub" style="margin:0">${uName(a.unit)} · ${modPill(a.modalidade)} · ${esc(a.professor)||'sem professor'}</p></div><div style="text-align:right"><div style="font-size:34px;font-weight:800;line-height:1;color:${f[1]}">${v}</div><span class="pill" style="background:${f[2]};color:${f[1]}">${f[0]}</span></div></div>`;
-    h+='<div style="font-size:12px;color:var(--muted);margin:14px 2px 6px">Por que este score (0–100 por dimensão)</div>';
-    h+=ISA_DIM.map(dm=>{const val=s[dm[0]];const c=val>=70?'#5BAD6F':val>=40?'#F2C94C':'#D64545';return `<div style="display:flex;align-items:center;gap:10px;margin:6px 0"><span style="width:172px;font-size:12px;color:var(--muted)">${dm[1]} <span style="font-size:10px">(${Math.round(ISA_W[dm[0]]*100)}%)</span></span><div class="bar"><i style="width:${val}%;background:${c}"></i></div><span style="width:34px;text-align:right;font-size:12px;font-weight:700">${val}</span></div>`;}).join('');
+    h+='<div style="font-size:12px;color:var(--muted);margin:14px 2px 6px">Por que este score (0–100 por dimensão)'+(a.presencaDias!=null?' · <span style="color:#0EA5A0">inclui presença (Frequência)</span>':'')+'</div>';
+    const _w=isaWeights(a);
+    h+=Object.keys(_w).map(k=>{const val=s[k]||0;const c=val>=70?'#5BAD6F':val>=40?'#F2C94C':'#D64545';return `<div style="display:flex;align-items:center;gap:10px;margin:6px 0"><span style="width:172px;font-size:12px;color:var(--muted)">${ISA_DIMLBL[k]} <span style="font-size:10px">(${Math.round(_w[k]*100)}%)</span></span><div class="bar"><i style="width:${val}%;background:${c}"></i></div><span style="width:34px;text-align:right;font-size:12px;font-weight:700">${val}</span></div>`;}).join('');
     h+=`<div class="urow" style="margin-top:14px"><span><b>Ação sugerida</b></span><b style="color:${f[1]}">${isaAcao(a)}</b></div>`;
     h+=`<div style="font-size:12px;color:var(--muted);margin-top:14px;margin-bottom:4px">Dados do aluno</div><div class="tbl"><table style="width:100%;font-size:12.5px"><tbody>
       <tr><td class="muted" style="padding:4px 0">Último acesso ao treino</td><td style="text-align:right">${a.recenciaDias!=null?a.recenciaDias+' dias atrás':'<span style="color:#999">sem registro</span>'}</td></tr>
+      <tr><td class="muted" style="padding:4px 0">Última presença (catraca)</td><td style="text-align:right">${a.presencaDias!=null?(a.presencaDias+' dias atrás'+(a.presencaCai===true?' · <span style="color:#D64545">frequência caindo</span>':'')):'<span style="color:#999">sem dado do Frequência</span>'}</td></tr>
+      ${riscoComposto(a)?'<tr><td colspan="2" style="padding:6px 0"><span class="pill c-red">⚠ Risco composto — presença↓ + uso↓</span></td></tr>':''}
       <tr><td class="muted" style="padding:4px 0">Treino</td><td style="text-align:right">${treinoPill(a.treinoStatus)}</td></tr>
       <tr><td class="muted" style="padding:4px 0">Usa o app (Pacto)</td><td style="text-align:right">${appPill(a.usaApp)}</td></tr>
       <tr><td class="muted" style="padding:4px 0">Contrato</td><td style="text-align:right">${contratoPill(a.diasContrato)}</td></tr>
