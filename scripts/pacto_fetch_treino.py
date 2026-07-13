@@ -361,7 +361,8 @@ def _pmh(m):
 def fetch_presenca():
     """Feed de PRESENCA por aluno (matricula hasheada) do Frequencia — ponte P1. Falha graciosamente."""
     try:
-        req = urllib.request.Request(PRESENCA_URL, headers={"Accept": "application/json"})
+        url = PRESENCA_URL + ("&" if "?" in PRESENCA_URL else "?") + "cb=" + str(int(time.time()))
+        req = urllib.request.Request(url, headers={"Accept": "application/json", "Cache-Control": "no-cache"})
         with urllib.request.urlopen(req, timeout=30) as r:
             j = json.loads(r.read().decode("utf-8", "replace"))
         al = j.get("alunos") if isinstance(j, dict) else None
