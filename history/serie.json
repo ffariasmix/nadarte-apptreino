@@ -609,21 +609,21 @@
   "data": "2026-07-13",
   "rede": {
    "usoApp": 41.0,
-   "emDiaPct": 63.9,
-   "vencidos": 865,
-   "avalVencidas": 501,
+   "emDiaPct": 64.1,
+   "vencidos": 861,
+   "avalVencidas": 500,
    "nota": 4.93,
-   "execSemana": 6918,
-   "ativos": 4939,
-   "engajado": 1070,
-   "morno": 3428,
-   "risco": 441,
+   "execSemana": 6993,
+   "ativos": 5003,
+   "engajado": 1085,
+   "morno": 3479,
+   "risco": 439,
    "semdado": 0,
-   "appSim": 1187,
-   "appNao": 3752,
+   "appSim": 1204,
+   "appNao": 3799,
    "appFalha": 0,
-   "fazTreino": 3432,
-   "naoFazTreino": 1467
+   "fazTreino": 3374,
+   "naoFazTreino": 1471
   },
   "unidades": [
    {
@@ -636,7 +636,7 @@
    {
     "id": "716Norte",
     "nome": "716 Norte",
-    "usoApp": 67.1,
+    "usoApp": 67.2,
     "emDiaPct": 58.0,
     "nota": 4.92
    },
@@ -645,13 +645,13 @@
     "nome": "905 Sul",
     "usoApp": 36.0,
     "emDiaPct": 74.0,
-    "nota": 4.98
+    "nota": 4.97
    },
    {
     "id": "LagoNorte",
     "nome": "Lago Norte",
     "usoApp": 34.3,
-    "emDiaPct": 45.0,
+    "emDiaPct": 46.0,
     "nota": 4.88
    },
    {
