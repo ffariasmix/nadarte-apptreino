@@ -673,41 +673,41 @@
  {
   "data": "2026-07-14",
   "rede": {
-   "usoApp": 41.1,
-   "emDiaPct": 62.0,
-   "vencidos": 910,
-   "avalVencidas": 505,
+   "usoApp": 41.2,
+   "emDiaPct": 62.5,
+   "vencidos": 896,
+   "avalVencidas": 504,
    "nota": 4.93,
-   "execSemana": 7054,
-   "ativos": 4996,
-   "engajado": 1086,
-   "morno": 3470,
-   "risco": 440,
+   "execSemana": 6844,
+   "ativos": 4955,
+   "engajado": 1081,
+   "morno": 3437,
+   "risco": 437,
    "semdado": 0,
-   "appSim": 1206,
-   "appNao": 3790,
+   "appSim": 1201,
+   "appNao": 3754,
    "appFalha": 0,
-   "fazTreino": 3413,
-   "naoFazTreino": 1469,
-   "aptos": 2342,
-   "recRecente": 1478,
-   "abandonados": 884,
-   "riscoComposto": 356,
-   "presencaCobertura": 2114
+   "fazTreino": 3383,
+   "naoFazTreino": 1453,
+   "aptos": 2331,
+   "recRecente": 1486,
+   "abandonados": 862,
+   "riscoComposto": 343,
+   "presencaCobertura": 2101
   },
   "unidades": [
    {
     "id": "604Norte",
     "nome": "604 Norte",
-    "usoApp": 42.8,
-    "emDiaPct": 53.0,
+    "usoApp": 43.1,
+    "emDiaPct": 54.0,
     "nota": 4.87
    },
    {
     "id": "716Norte",
     "nome": "716 Norte",
     "usoApp": 67.1,
-    "emDiaPct": 57.0,
+    "emDiaPct": 58.0,
     "nota": 4.92
    },
    {
@@ -722,19 +722,19 @@
     "nome": "Lago Norte",
     "usoApp": 34.4,
     "emDiaPct": 45.0,
-    "nota": 4.87
+    "nota": 4.88
    },
    {
     "id": "LagoSul",
     "nome": "Lago Sul",
     "usoApp": 15.2,
-    "emDiaPct": 78.0,
-    "nota": 4.93
+    "emDiaPct": 80.0,
+    "nota": 4.94
    },
    {
     "id": "Natal",
     "nome": "Natal/RN",
-    "usoApp": 57.7,
+    "usoApp": 58.1,
     "emDiaPct": 46.0,
     "nota": 4.98
    }
