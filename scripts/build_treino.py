@@ -12,10 +12,59 @@ TEMPLATE = "template/index.html"
 OUT_DIR = "public"
 HIST = "history/serie.json"   # historico AGREGADO por dia (sem PII) — versionado no repo
 MARKER = "/*__DATA__*/null"
+AGENDA_FEED = "public/agenda_treino.json"   # Item 6 — fila do App Treino p/ a Agenda Tatica (origem='treino')
 
 def num(v):
     try: return float(v)
     except Exception: return 0.0
+
+# ---- Item 6: feed CRM do App Treino para o MOTOR da Agenda Tatica ----
+# O motor.mjs (repo Frequencia) ja tem um slot `crm:[]` (hoje vazio) que consome
+# {unidade,matricula,nome,cat,foto,faixa,usaApp,treinoVencido}. Publicamos exatamente
+# esse formato: o motor faz o dedup (1 aluno = 1 card), soma pontos de CRM aos sinais
+# de frequencia do mesmo aluno, pontua e distribui em blocos. Sem alterar a engine.
+# Gatilho de card = sinal ACIONAVEL (faixa risco OU treino vencido). morno/sem-app
+# NAO disparam card sozinhos (o motor promove todo candidato abaixo do teto, entao
+# alimenta-los encheria a Agenda com ruido de baixo valor); eles seguem no payload
+# apenas como enriquecimento de quem ja passou pelo gatilho. recenciaDias/presencaCai
+# vao como contexto (o motor ignora campos extras; abrem caminho p/ evolucao futura).
+AG_SLUG = {"716Norte":"716-norte","905Sul":"905-sul","604Norte":"604-norte",
+           "LagoNorte":"lago-norte","LagoSul":"lago-sul","Natal":"natal-rn"}
+
+def build_agenda_feed(data):
+    al = data.get("alunos", [])
+    isn = lambda x: isinstance(x, (int, float))
+    apta = [a for a in al if "fitness" in str(a.get("modalidade") or "").lower()]
+    crm = []
+    for a in apta:
+        slug = AG_SLUG.get(a.get("unit"))
+        if not slug:
+            continue
+        faixa = a.get("faixa")
+        venc = a.get("treinoStatus") == "vencido"
+        ua = a.get("usaApp")
+        # Gatilho de card = sinal ACIONAVEL: faixa risco OU treino vencido.
+        # (morno/sem-app entram no payload como enriquecimento de quem ja passou por
+        #  este filtro, mas nunca disparam card sozinhos -> evita encher o teto com ruido.)
+        if not (faixa == "risco" or venc):
+            continue
+        rec = a.get("recenciaDias")
+        crm.append({
+            "unidade": slug, "matricula": str(a.get("matricula") or ""),
+            "nome": a.get("nome") or "", "cat": "fitness", "foto": a.get("foto") or "",
+            "faixa": faixa, "usaApp": ua, "treinoVencido": venc,
+            "recenciaDias": rec if isn(rec) else None,
+            "presencaCai": (a.get("presencaCai") is True),
+        })
+    feed = {"gerado": datetime.date.today().isoformat(), "origem": "treino", "crm": crm}
+    os.makedirs(os.path.dirname(AGENDA_FEED), exist_ok=True)
+    json.dump(feed, open(AGENDA_FEED, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    porf = {}
+    for c in crm:
+        k = c["faixa"] or "—"
+        porf[k] = porf.get(k, 0) + 1
+    print("[agenda] %s: %d candidatos CRM p/ o motor %s" % (AGENDA_FEED, len(crm), porf), file=sys.stderr)
+    return feed
 
 def snapshot(data):
     """Monta o snapshot AGREGADO de hoje (sem PII) para a serie historica."""
@@ -129,6 +178,7 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     open(os.path.join(OUT_DIR, "index.html"), "w", encoding="utf-8").write(out)
     print("OK -> %s/index.html" % OUT_DIR, file=sys.stderr)
+    build_agenda_feed(data)   # Item 6 — publica a fila do App Treino p/ a Agenda Tatica
 
 if __name__ == "__main__":
     main()
