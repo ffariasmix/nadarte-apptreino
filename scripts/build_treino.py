@@ -29,6 +29,15 @@ def snapshot(data):
     execSemana = int(sum(num(u.get("execucoesSemana")) for u in unis))
     al = data.get("alunos", [])
     faixa = lambda f: sum(1 for a in al if a.get("faixa") == f)
+    # Item 7 — metricas de risco (base apta) para tendencia historica
+    _isnum = lambda x: isinstance(x, (int, float))
+    apta = [a for a in al if "fitness" in str(a.get("modalidade") or "").lower()]
+    recRec = sum(1 for a in apta if _isnum(a.get("recenciaDias")) and a["recenciaDias"] <= 14)
+    aband = sum(1 for a in apta if _isnum(a.get("diasContrato")) and a["diasContrato"] >= 0 and a.get("fazTreino") is True
+                and ((_isnum(a.get("recenciaDias")) and a["recenciaDias"] >= 30) or a.get("treinoStatus") == "vencido"))
+    comp = sum(1 for a in apta if (a.get("presencaCai") is True or (_isnum(a.get("presencaDias")) and a["presencaDias"] >= 15))
+               and (_isnum(a.get("recenciaDias")) and a["recenciaDias"] >= 15))
+    presCob = sum(1 for a in apta if _isnum(a.get("presencaDias")))
     return {
         "data": datetime.date.today().isoformat(),
         "rede": {
@@ -45,6 +54,9 @@ def snapshot(data):
             "appFalha": sum(1 for a in al if a.get("usaApp") is None),
             "fazTreino": sum(1 for a in al if a.get("fazTreino") is True),
             "naoFazTreino": sum(1 for a in al if a.get("fazTreino") is False),
+            # Item 7 — risco (base apta) p/ tendencia
+            "aptos": len(apta), "recRecente": recRec, "abandonados": aband,
+            "riscoComposto": comp, "presencaCobertura": presCob,
         },
         "unidades": [{"id": u.get("id"), "nome": u.get("nome"),
                       "usoApp": round(num(u.get("percUtilizamApp")), 1),

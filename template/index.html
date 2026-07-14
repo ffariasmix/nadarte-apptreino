@@ -198,7 +198,7 @@ window.DATA = /*__DATA__*/null;
   const N = v => Number(v)||0;
   if(D.gerado_em){ try{ document.getElementById('asof').textContent = new Date(D.gerado_em).toLocaleString('pt-BR'); }catch(e){} }
 
-  let state = {unit:'all', tab:'geral', crmFaixa:'all', crmPub:'all', crmMod:'all', crmProf:'all', crmContrato:'all', crmTreino:'all', crmRec:'all', crmIsa:'all', crmComp:'all', crmQ:'', crmPage:1, crmSort:{k:null,dir:1}, profSort:{k:null,dir:1}, scoreIni:'all', scoreProf:'all', scoreContrato:'all', scoreQ:'', scorePage:1, scoreSort:{k:null,dir:1}, histPeriod:'dia'};
+  let state = {unit:'all', tab:'geral', crmFaixa:'all', crmPub:'all', crmMod:'all', crmProf:'all', crmContrato:'all', crmTreino:'all', crmRec:'all', crmIsa:'all', crmComp:'all', crmAband:'all', crmOnb:'all', crmQ:'', crmPage:1, crmSort:{k:null,dir:1}, profSort:{k:null,dir:1}, scoreIni:'all', scoreProf:'all', scoreContrato:'all', scoreQ:'', scorePage:1, scoreSort:{k:null,dir:1}, histPeriod:'dia'};
   const sel = () => state.unit==='all' ? ALL : ALL.filter(u=>u.id===state.unit);
   const sum = k => sel().reduce((a,u)=>a+N(u[k]),0);
   const wavg = (k,w) => { let n=0,d=0; sel().forEach(u=>{const ww=N(u[w]); if(u[k]!=null){n+=Number(u[k])*ww; d+=ww;}}); return d?n/d:null; };
@@ -289,7 +289,6 @@ window.DATA = /*__DATA__*/null;
   }
 
   function renderGeral(){
-    const totAl=sum('totalAlunos');
     // Nota do treino (estrelas) e aderência (gerados x executados)
     const est=[1,2,3,4,5].map(i=>sum('nr'+i+'estrelas'));
     const ntot=est.reduce((a,b)=>a+b,0);
@@ -493,7 +492,7 @@ window.DATA = /*__DATA__*/null;
       <div class="meth"><h3>Fontes dos indicadores (API Pacto)</h3>
         <p class="sub">Tudo agregado por unidade (uma ApiKey por unidade, <code>empresaId=1</code>, <code>idProfessor=0</code> = total da unidade).</p>
         <div class="scroll"><table class="map"><thead><tr><th>Indicador</th><th>Endpoint / campo</th></tr></thead><tbody>
-          <tr><td><b>Base de alunos</b></td><td><code>/psec/treino-bi/dados</code> → totalAlunos, totalAlunosAtivos</td></tr>
+          <tr><td><b>Base de alunos (SSOT)</b></td><td><code>/clientes/simples</code> (carteira ativa) → recortada no público-alvo (planos com Fitness). O <code>totalAlunos</code> do BI treino foi descontinuado da exibição por não bater com a carteira.</td></tr>
           <tr><td><b>Uso do app</b></td><td><code>dados.percUtilizamApp</code></td></tr>
           <tr><td><b>Treinos em dia</b></td><td><code>dados.totalTreinosEmdia</code> / <code>percentualEmDia</code></td></tr>
           <tr><td><b>Treinos vencidos</b></td><td><code>dados.totalTreinosVencidos</code> (+ totalTreinosRenovar)</td></tr>
@@ -535,6 +534,15 @@ window.DATA = /*__DATA__*/null;
       <div class="meth"><h3>Tabela comparativa (Unidades)</h3>
         <div class="note"><b>% c/ treino</b> e <b>Uso app</b> são sobre o <b>público-alvo</b> (ativos com plano de Fitness). <b>% aval. em dia</b> = <b>feitas ÷ (feitas + vencidas)</b> — o mesmo par de colunas ao lado, sobre as avaliações previstas da unidade. A Pacto não expõe avaliação por aluno, então não dá pra recortar por Fitness.</div>
       </div>
+      ${(function(){const al=D.alunos||[];const n=al.length||1;
+        const rows=[['Alunos ativos (carteira)',al.length,al.length],
+          ['Com modalidade classificada',al.filter(a=>a.modalidade).length,n],
+          ['Com recência (último acesso)',al.filter(a=>a.recenciaDias!=null).length,n],
+          ['Com presença (ponte Frequência)',al.filter(a=>a.presencaDias!=null).length,n],
+          ['Com professor vinculado',al.filter(a=>a.professor).length,n]];
+        return '<div class="meth"><h3>Qualidade dos dados (observabilidade)</h3><p class="sub">cobertura por campo na coleta atual · '+(D.gerado_em||'')+'</p><div class="scroll"><table class="map"><thead><tr><th>Campo</th><th>Cobertura</th></tr></thead><tbody>'
+          +rows.map(r=>`<tr><td>${r[0]}</td><td style="text-align:right"><b>${fmt(r[1])}</b> <span style="color:var(--muted)">(${pct(r[1]/r[2]*100)})</span></td></tr>`).join('')
+          +'</tbody></table></div><div class="note">Feed de presença: <code>raw.githubusercontent</code> (cache-buster). Coleta diária 06h com GATE — não publica se o dado não fechar. Divergências e nulos acima ajudam a detectar queda de fonte/schema drift.</div></div>';})()}
       <div class="meth"><h3>Arquitetura</h3>
         <p class="sub">Robô no GitHub Actions coleta a API (chaves nos Secrets), valida (gate) e publica no Cloudflare Pages. Atualização diária automática. Os agregados por unidade não têm PII; o CRM por aluno traz nome e contato e por isso a página fica protegida por login (Cloudflare Access).</p>
       </div>`;
@@ -556,6 +564,15 @@ window.DATA = /*__DATA__*/null;
     if(!P.length){ el.innerHTML='<div class="empty" style="margin-top:20px">Sem professores com vínculo de treino nesta seleção.</div>'; return; }
     const medal=r=>r===0?'🥇':r===1?'🥈':r===2?'🥉':(r+1)+'º';
     const col=v=>v>=70?'#3f8a52':v>=45?'#a97c00':'#b53434'; const bg=v=>v>=70?'#E7F4EB':v>=45?'#FDF3DC':'#FBE8E8';
+    // Item 4 — alertas por professor, NORMALIZADOS pela carteira (proporção, não volume absoluto)
+    const _cart=p=>(D.alunos||[]).filter(a=>String(a.professorId)===String(p.id));
+    function profAlertas(p){ const cart=N(p.carteiraReal),out=[];
+      const pv=cart? N(p.vencidos)/cart*100 : 0;
+      const rk=_cart(p).filter(a=>isaScore(a)<40).length, pr=cart? rk/cart*100 : 0;
+      if(cart>=150) out.push(['carteira alta','#B5731A']);
+      if(pv>=40) out.push([Math.round(pv)+'% vencidos','#D64545']);
+      if(pr>=30) out.push([Math.round(pr)+'% em risco','#8B1A1A']);
+      return out; }
     const n=P.length, medEmDia=Math.round(P.reduce((a,p)=>a+N(p.pctEmDia),0)/n), venc=P.reduce((a,p)=>a+N(p.vencidos),0);
     let h='<div class="sec">Professores 360º — '+(state.unit==='all'?'rede':uName(state.unit))+' ('+fmt(n)+' professores)</div>';
     h+='<div class="kgrid" style="grid-template-columns:repeat(3,1fr)">'
@@ -565,7 +582,7 @@ window.DATA = /*__DATA__*/null;
       +'</div>';
     h+='<div class="sec">Ranking de atuação <span style="font-weight:600;color:var(--muted);font-size:12px">— clique num professor para ver os alunos da carteira</span></div><div class="tbl"><div class="scroll"><table><thead><tr>'
       +'<th>#</th>'+[['nome','Professor'],['unit','Unidade'],['carteiraReal','Carteira'],['comTreino','Alunos c/ treino'],['emDia','Em dia'],['vencidos','Vencidos'],['pctEmDia','% em dia'],['notaMedia','Nota'],['indice','Índice']].map(c=>`<th class="sortable" data-k="${c[0]}">${c[1]}${_sarr(PS,c[0])}</th>`).join('')+'</tr></thead><tbody>';
-    h+=P.map((p,i)=>`<tr class="click" data-pid="${esc(p.id)}"><td style="font-size:15px">${medal(i)}</td><td><div class="aluno-cell">${avatar(p)}<div class="nm">${esc(p.nome)||('Prof '+(p.id||''))}</div></div></td><td>${uName(p.unit)}</td>
+    h+=P.map((p,i)=>`<tr class="click" data-pid="${esc(p.id)}"><td style="font-size:15px">${medal(i)}</td><td><div class="aluno-cell">${avatar(p)}<div><div class="nm">${esc(p.nome)||('Prof '+(p.id||''))}</div>${profAlertas(p).map(a=>`<span class="pill" style="background:${a[1]}18;color:${a[1]};font-size:9.5px;margin:2px 3px 0 0;padding:1px 7px">⚠ ${a[0]}</span>`).join('')}</div></div></td><td>${uName(p.unit)}</td>
       <td><b>${fmt(p.carteiraReal||0)}</b></td><td>${fmt(p.comTreino)}</td><td>${fmt(p.emDia)}</td>
       <td><span class="pill ${N(p.vencidos)>0?'c-red':'c-green'}">${fmt(p.vencidos)}</span></td>
       <td>${pct(p.pctEmDia)}</td>
@@ -671,6 +688,11 @@ window.DATA = /*__DATA__*/null;
   const REC_COLOR={'0-7':'#5BAD6F','8-14':'#8FBF5B','15-30':'#F2C94C','31-60':'#E8934C','60+':'#D64545','semreg':'#9B96A0'};
   function recBucket(a){ const d=a&&a.recenciaDias; if(d==null) return 'semreg'; if(d<=7)return '0-7'; if(d<=14)return '8-14'; if(d<=30)return '15-30'; if(d<=60)return '31-60'; return '60+'; }
   function recPill(a){ const d=a&&a.recenciaDias; if(d==null) return '<span class="pill" style="background:#EEE;color:#999">—</span>'; const k=recBucket(a),c=REC_COLOR[k]; return `<span class="pill" style="background:${c}22;color:${c}">${d}d</span>`; }
+  // Item 3 — aluno "abandonado": ativo, faz treino, mas sem acompanhamento (app parado 30d+ OU treino vencido)
+  function abandonado(a){ return a.diasContrato!=null && a.diasContrato>=0 && a.fazTreino===true && ((a.recenciaDias!=null&&a.recenciaDias>=30) || a.treinoStatus==='vencido'); }
+  // Item 9 — onboarding digital pendente: aluno novo (contrato começou ≤30d) que ainda não usa o app
+  function tempoCasaDias(a){ return a.inicioContrato? Math.round((Date.now()-a.inicioContrato)/86400000) : null; }
+  function onboardingPend(a){ const tc=tempoCasaDias(a); return tc!=null && tc<=30 && a.usaApp!==true; }
   const contratoBucket = d => d==null? 'vigente' : (d<0?'vencido':(d<=30?'vencendo':'vigente'));
   const _fld = (label,ctrl) => `<div class="fld"><label>${label}</label>${ctrl}</div>`;
   const _sel = (id,opts,cur) => `<select class="fsel" data-sel="${id}">`+opts.map(o=>`<option value="${esc(String(o[0]))}" ${String(o[0])===String(cur)?'selected':''}>${esc(o[1])}</option>`).join('')+`</select>`;
@@ -699,6 +721,8 @@ window.DATA = /*__DATA__*/null;
     if(state.crmRec!=='all')      A=A.filter(a=> state.crmRec==='rec' ? (a.recenciaDias!=null&&a.recenciaDias<=14) : recBucket(a)===state.crmRec);
     if(state.crmIsa!=='all')      A=A.filter(a=> isaKey(isaScore(a))===state.crmIsa);
     if(state.crmComp==='sim')     A=A.filter(a=> riscoComposto(a));
+    if(state.crmAband==='sim')    A=A.filter(abandonado);
+    if(state.crmOnb==='sim')      A=A.filter(onboardingPend);
     if(state.crmContrato!=='all') A=A.filter(a=> contratoBucket(a.diasContrato)===state.crmContrato);
     const qq=(state.crmQ||'').trim().toLowerCase();
     if(qq) A=A.filter(a=>String(a.nome||'').toLowerCase().includes(qq)||String(a.email||'').toLowerCase().includes(qq));
@@ -777,6 +801,8 @@ window.DATA = /*__DATA__*/null;
       +_fld('Recência',_sel('crmRec',[['all','Todas'],['rec','Recente ≤14d'],['15-30','15–30d'],['31-60','31–60d'],['60+','60+d'],['semreg','Sem registro']],state.crmRec))
       +_fld('Saúde (ISA)',_sel('crmIsa',[['all','Todas'],['sau','Saudável'],['ate','Atenção'],['rmo','Risco moderado'],['ralto','Risco alto'],['crit','Crítico']],state.crmIsa))
       +_fld('Risco composto',_sel('crmComp',[['all','Todos'],['sim','presença↓ + uso↓']],state.crmComp))
+      +_fld('Abandonado',_sel('crmAband',[['all','Todos'],['sim','sem acompanhamento']],state.crmAband))
+      +_fld('Onboarding',_sel('crmOnb',[['all','Todos'],['sim','novo sem app']],state.crmOnb))
       +'</div><p class="sub" style="margin:0 2px 4px">Clique numa linha para ver o Índice de Saúde (ISA) do aluno · no cabeçalho para ordenar.</p>';
     h+='<div id="crmResults" style="margin-top:8px"></div>';
     el.innerHTML=h;
@@ -918,6 +944,9 @@ window.DATA = /*__DATA__*/null;
       {t:'Contrato vencido',              n:B.filter(a=>a.diasContrato!=null&&a.diasContrato<0).length, crit:'contrato com dias < 0', ac:'reativação / renovação', c:'#D64545'},
       {t:'Alunos em risco',               n:B.filter(a=>a.faixa==='risco').length,        crit:'não usam o app + contrato vencendo/vencido', ac:'contato de retenção', c:'#D64545'},
       {t:'Contrato vence em ≤30d',        n:B.filter(a=>a.diasContrato!=null&&a.diasContrato>=0&&a.diasContrato<=30).length, crit:'contrato entre 0 e 30 dias', ac:'renovação antecipada', c:'#F2C94C'},
+      {t:'Abandonados (sem acompanhamento)',n:B.filter(abandonado).length,             crit:'ativo + faz treino, mas app parado 30d+ ou treino vencido', ac:'lista nominal p/ o professor resgatar', c:'#D64545'},
+      {t:'Onboarding digital pendente',   n:B.filter(onboardingPend).length,            crit:'aluno novo (≤30d de casa) que ainda não usa o app', ac:'ativar o app na 1ª semana', c:'#7A5AA8'},
+      {t:'Risco composto (presença↓+uso↓)',n:B.filter(riscoComposto).length,            crit:'presença caindo/ausente E app parado (ponte Frequência)', ac:'resgate prioritário', c:'#8B1A1A'},
     ].sort((x,y)=>y.n-x.n);
     const maxVol=Math.max(1,...vol.map(v=>v.n));
     let h='<div class="sec">Score &amp; Ações — '+(state.unit==='all'?'rede':uName(state.unit))+'</div>';
