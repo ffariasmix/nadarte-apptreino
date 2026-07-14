@@ -409,14 +409,17 @@ window.DATA = /*__DATA__*/null;
     const rea=sumOf(uu,'avaliacoesRealizadas'), atr=sumOf(uu,'avaliacoesAtrasadas');
     const aval=(rea+atr)? rea/(rea+atr)*100 : 0;
     const atd=sumOf(uu,'totalAlunos')? sumOf(uu,'acompanhamentoEm')/sumOf(uu,'totalAlunos')*100 : 0;
+    const atdMedido = atd >= 2;   // < 2% = professores ainda nao registram -> nao entra no indice (Item 5)
     const defs=[
       {k:'Uso do App',v:usoApp,alvo:100,peso:0.30,base:'da base apta'},
       {k:'Treinos em dia',v:treino,alvo:85,peso:0.30,base:'de quem usa o app'},
       {k:'Avaliações em dia',v:aval,alvo:75,peso:0.20,base:'unidade (proxy)'},
-      {k:'Atendimento',v:atd,alvo:100,peso:0.20,base:'unidade (proxy)'},
+      {k:'Atendimento',v:atd,alvo:100,peso:0.20,base:'unidade (proxy)',naoMedido:!atdMedido},
     ];
     defs.forEach(d=>d.at=Math.min(100, d.alvo? d.v/d.alvo*100 : 0));
-    return {defs, indice:Math.round(defs.reduce((a,d)=>a+d.peso*d.at,0)), eleg:eligB.length};
+    // indice = so pilares MEDIDOS, pesos re-normalizados (não penaliza por dado não alimentado)
+    const medidos=defs.filter(d=>!d.naoMedido), wsum=medidos.reduce((a,d)=>a+d.peso,0)||1;
+    return {defs, indice:Math.round(medidos.reduce((a,d)=>a+(d.peso/wsum)*d.at,0)), eleg:eligB.length, atdMedido};
   }
   function metaFarol(at){ return at>=100?'#5BAD6F':at>=70?'#F2C94C':'#D64545'; }
   function metasPanel(){
@@ -425,14 +428,17 @@ window.DATA = /*__DATA__*/null;
     let h='<div class="sec">Índice de metas (0–100)</div><div class="panel"><div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">'
       +`<div style="text-align:center;min-width:96px"><div style="font-size:44px;font-weight:800;line-height:1;color:${metaFarol(m.indice)}">${m.indice}</div><div style="color:var(--muted);font-size:12px;margin-top:5px">índice ponderado</div></div>`
       +'<div style="flex:1;min-width:300px">';
-    h+=m.defs.map(d=>`<div style="display:flex;align-items:center;gap:12px;margin:10px 0">
-      <div style="width:172px;font-size:12.5px"><b>${d.k}</b><div style="color:var(--muted);font-size:11px">peso ${Math.round(d.peso*100)}% · ${d.base}</div></div>
+    h+=m.defs.map(d=>d.naoMedido?`<div style="display:flex;align-items:center;gap:12px;margin:10px 0;opacity:.72">
+      <div style="width:172px;font-size:12.5px"><b>${d.k}</b><div style="color:var(--muted);font-size:11px">fora do índice · não medido</div></div>
+      <div class="bar" title="pilar sem dado — não pontua"><i style="width:0%"></i></div>
+      <div style="width:158px;text-align:right;font-size:12px"><span style="color:var(--muted);font-style:italic">não medido</span><div style="color:var(--muted);font-size:11px">peso redistribuído</div></div></div>`:`<div style="display:flex;align-items:center;gap:12px;margin:10px 0">
+      <div style="width:172px;font-size:12.5px"><b>${d.k}</b><div style="color:var(--muted);font-size:11px">peso ${Math.round(d.peso/(m.atdMedido?1:0.8)*100)}% · ${d.base}</div></div>
       <div class="bar" title="atingimento do alvo"><i style="width:${d.at}%;background:${metaFarol(d.at)}"></i></div>
       <div style="width:158px;text-align:right;font-size:12px"><b style="font-size:14px">${pct(d.v)}</b> <span style="color:var(--muted)">/ alvo ${d.alvo}%</span><div style="color:${metaFarol(d.at)};font-size:11px;font-weight:700">${Math.round(d.at)}% do alvo</div></div></div>`).join('');
     h+='</div></div>';
     const atd=m.defs.find(d=>d.k==='Atendimento');
-    h+='<div class="note"><b>Como ler:</b> o <b>peso</b> é quanto o pilar vale na nota final; a <b>barra</b> mostra o <b>atingimento</b> (atual ÷ alvo); à direita, o <b>atual</b> e o <b>alvo</b>. Índice = Σ(peso × atingimento). Pilares: <b>Uso do App</b> (peso 30%, base apta, alvo 100%) · <b>Treinos em dia</b> (30%, base = quem usa o app, alvo 85%) · <b>Avaliações em dia</b> (20%, alvo 75% — <i>proxy da unidade, a Pacto não expõe avaliação por aluno</i>) · <b>Atendimento</b> (20%, alvo 100% — <i>proxy da unidade</i>). A <b>nota do treino</b> é indicador à parte. Verde = meta batida · amarelo = perto · vermelho = distante.'
-      + ((atd && atd.v<5) ? ' <b>Atendimento vem baixo</b> porque os professores ainda não registram atendimento pelo App Treino.' : '')
+    h+='<div class="note"><b>Como ler:</b> o <b>peso</b> é quanto o pilar vale na nota final; a <b>barra</b> mostra o <b>atingimento</b> (atual ÷ alvo); à direita, o <b>atual</b> e o <b>alvo</b>. Índice = Σ(peso × atingimento) só sobre pilares <b>medidos</b>. Pilares: <b>Uso do App</b> (base apta, alvo 100%) · <b>Treinos em dia</b> (base = quem usa o app, alvo 85%) · <b>Avaliações em dia</b> (alvo 75% — <i>proxy da unidade, a Pacto não expõe avaliação por aluno</i>) · <b>Atendimento</b> (alvo 100% — <i>proxy da unidade</i>). A <b>nota do treino</b> é indicador à parte. Verde = meta batida · amarelo = perto · vermelho = distante.'
+      + ((atd && atd.naoMedido) ? ' <b>Atendimento está marcado como "não medido"</b> porque os professores ainda não registram atendimento pelo App Treino — para não penalizar a nota injustamente, seu peso é <b>redistribuído</b> entre os demais pilares. Assim que passar a ser alimentado, ele volta a compor o índice automaticamente.' : '')
       + '</div>';
     return h;
   }
@@ -455,7 +461,10 @@ window.DATA = /*__DATA__*/null;
           <div style="flex:1;font-weight:700;font-size:14px">${r.u.nome}${r.u.notaMedia!=null?` <span style="color:var(--muted);font-weight:600;font-size:11px">${(Math.round(r.u.notaMedia*100)/100).toLocaleString('pt-BR')}★</span>`:''}</div>
           <div style="font-size:30px;font-weight:800;line-height:1;color:${metaFarol(r.m.indice)}">${r.m.indice}</div>
         </div>
-        ${r.m.defs.map(d=>`<div style="display:flex;align-items:center;gap:8px;margin:5px 0">
+        ${r.m.defs.map(d=>d.naoMedido?`<div style="display:flex;align-items:center;gap:8px;margin:5px 0;opacity:.6">
+          <span style="width:104px;font-size:11px;color:var(--muted)">${d.k}</span>
+          <div class="bar"><i style="width:0%"></i></div>
+          <span style="width:82px;text-align:right;font-size:11px;color:var(--muted);font-style:italic">n/d</span></div>`:`<div style="display:flex;align-items:center;gap:8px;margin:5px 0">
           <span style="width:104px;font-size:11px;color:var(--muted)">${d.k}</span>
           <div class="bar"><i style="width:${d.at}%;background:${metaFarol(d.at)}"></i></div>
           <span style="width:82px;text-align:right;font-size:11px"><b>${pct(d.v)}</b><span style="color:var(--muted)"> /${d.alvo}%</span></span></div>`).join('')}
