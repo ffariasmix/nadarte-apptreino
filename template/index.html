@@ -89,9 +89,15 @@
   .empty{background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:40px;text-align:center;color:var(--muted)}
   .av{width:34px;height:34px;border-radius:50%;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;background:var(--orange);position:relative;overflow:hidden}
   .avimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-  .aluno-cell{display:flex;align-items:center;gap:10px}.aluno-cell .nm{font-weight:700}.aluno-cell .ct{font-size:11px;color:var(--muted)}
+  .aluno-cell{display:flex;align-items:flex-start;gap:10px;max-width:250px}.aluno-cell>div{min-width:0}.aluno-cell .nm{font-weight:700;line-height:1.25}.aluno-cell .ct{font-size:11px;color:var(--muted)}
+  .aluno-cell .contacts{display:flex;flex-direction:column;gap:1px;margin-top:3px}.aluno-cell .contacts .ct{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
   .subf{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:14px 0 4px}
-  .filterbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow);margin:14px 0}
+  .filterbar{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow);margin:14px 0;display:flex;flex-direction:column;gap:12px}
+  .fbar-top{display:flex;gap:10px;align-items:stretch}
+  .fsearch{flex:1;display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:0 12px;background:var(--card)}
+  .fsearch svg{color:var(--muted);flex:0 0 auto}.fsearch input{border:none;outline:none;padding:10px 0;font-size:13.5px;width:100%;background:transparent;color:var(--ink);font-family:inherit}
+  .fclear{border:1px solid var(--line);background:var(--soft);border-radius:8px;padding:0 15px;font-size:12.5px;color:var(--muted);cursor:pointer;font-family:inherit;white-space:nowrap}.fclear:hover{background:var(--line);color:var(--ink)}
+  .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
   .fld{display:flex;flex-direction:column;gap:4px;min-width:0}
   .fld>label{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
   .fsel,.finp{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:var(--card);color:var(--ink);width:100%;max-width:100%}
@@ -109,10 +115,11 @@
   .modal{position:fixed;top:0;left:0;inset:0;width:100vw;height:100vh;height:100dvh;background:rgba(45,45,45,.45);display:none;align-items:center;justify-content:center;z-index:60;padding:18px;overflow:auto}
   .modal.on{display:flex}
   .modalc{background:#fff;border-radius:16px;max-width:640px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.3);max-height:88vh;overflow:auto;position:relative}
-  .pmx{position:absolute;top:14px;right:16px;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1}
+  .pmx{position:absolute;top:14px;right:14px;width:30px;height:30px;border-radius:50%;background:var(--soft);border:1px solid var(--line);color:var(--muted);font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;z-index:3}
+  .pmx:hover{background:var(--line);color:var(--ink)}
   @media(max-width:900px){.kgrid{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}.ugrid{grid-template-columns:1fr}.road{grid-template-columns:1fr}}
   @media(max-width:640px){
-    .filterbar{grid-template-columns:1fr 1fr}
+    .fgrid{grid-template-columns:1fr 1fr}
     .rtable table,.rtable thead,.rtable tbody,.rtable tr,.rtable td{display:block}
     .rtable thead{position:absolute;left:-9999px;height:0;overflow:hidden}
     .rtable tr{border:1px solid var(--line);border-radius:12px;margin:0 6px 10px;padding:4px 2px;background:var(--card)}
@@ -122,7 +129,7 @@
     .rtable td:first-child::before{display:none}
     .rtable .pager{flex-direction:column;align-items:stretch;gap:8px}
   }
-  @media(max-width:460px){.kgrid{grid-template-columns:1fr}.asof{margin-left:0;width:100%}.filterbar{grid-template-columns:1fr}}
+  @media(max-width:460px){.kgrid{grid-template-columns:1fr}.asof{margin-left:0;width:100%}.fgrid{grid-template-columns:1fr}.fbar-top{flex-direction:column}}
   /* botão de alternar tema */
   .tbtn{background:var(--card);border:1px solid var(--line);border-radius:999px;width:34px;height:34px;cursor:pointer;font-size:15px;line-height:1;display:inline-flex;align-items:center;justify-content:center;color:var(--ink);flex:0 0 auto;margin-left:10px;transition:var(--transition-base,all .2s ease)}
   .tbtn:hover{border-color:var(--orange)}
@@ -169,7 +176,7 @@
     <button class="tab" data-v="profs">Professores 360º</button>
     <button class="tab" data-v="crm">CRM 360º (alunos)</button>
     <button class="tab" data-v="score">Score &amp; Ações</button>
-    <button class="tab" data-v="metodo">Metodologia &amp; API</button>
+    <button class="tab" data-v="metodo" id="tabMetodo" style="display:none">Metodologia &amp; API</button>
   </div>
 </div></div>
 <main class="wrap">
@@ -237,7 +244,7 @@ window.DATA = /*__DATA__*/null;
       s+=`<path d="M${x1} ${y1} A${r} ${r} 0 ${big} 1 ${x2} ${y2} L${xi1} ${yi1} A${rin} ${rin} 0 ${big} 0 ${xi2} ${yi2} Z" fill="${seg.color}"/>`; ang=a2;});
     s+=`<text x="90" y="92" text-anchor="middle" font-size="23" font-weight="800" fill="#2D2D2D">${tot?Math.round(segs[0].value/tot*100):0}%</text>`;
     s+=`<text x="90" y="110" text-anchor="middle" font-size="10.5" fill="#8A8A8A">em dia</text>`;
-    let ly=34; segs.forEach(seg=>{s+=`<rect x="195" y="${ly}" width="12" height="12" rx="3" fill="${seg.color}"/><text x="214" y="${ly+11}" font-size="12.5" fill="#2D2D2D">${seg.label}</text><text x="320" y="${ly+11}" font-size="12.5" font-weight="700" text-anchor="end" fill="#6a6a6a">${fmt(seg.value)}</text>`; ly+=30;});
+    let ly=40; segs.forEach(seg=>{const pv=tot?Math.round(seg.value/tot*100):0; s+=`<rect x="195" y="${ly}" width="12" height="12" rx="3" fill="${seg.color}"/><text x="214" y="${ly+11}" font-size="12.5" fill="#2D2D2D">${seg.label}</text><text x="320" y="${ly+8}" font-size="12.5" font-weight="700" text-anchor="end" fill="#6a6a6a">${fmt(seg.value)}</text><text x="320" y="${ly+21}" font-size="10.5" text-anchor="end" fill="#9a9a9a">${pv}%</text>`; ly+=38;});
     return s+'</svg>';
   }
   function lineChart(pts, keys){
@@ -365,7 +372,7 @@ window.DATA = /*__DATA__*/null;
        +'</div></div></div>';
     (function(){const mx=Math.max(1,...execDia.map(x=>x.v)); const tsem=execDia.reduce((a,x)=>a+x.v,0)||1;
      h+='<div class="panel"><h3>Alunos que treinaram por dia</h3><p class="sub">frequência real (acessos) · média por dia da semana · '+(state.unit==='all'?'rede':uName(state.unit))+' · '+fmt(execSem)+'/semana típica</p>'
-       +execDia.map(x=>`<div style="display:flex;align-items:center;gap:10px;margin:5px 0"><span style="width:34px;font-size:12px;color:var(--muted)">${DLAB[x.dia]}</span><div class="bar"><i style="width:${x.v/mx*100}%;background:#5BAD6F"></i></div><span style="width:100px;text-align:right;font-size:12px"><b>${fmt(x.v)}</b> <span style="color:var(--muted);font-size:11px">(${pct(x.v/tsem*100)} da sem.)</span></span></div>`).join('')
+       +execDia.map(x=>`<div style="display:flex;align-items:center;gap:10px;margin:5px 0"><span style="width:34px;font-size:12px;color:var(--muted)">${DLAB[x.dia]}</span><div class="bar"><i style="width:${x.v/mx*100}%;background:#5BAD6F"></i></div><span style="width:96px;text-align:right;font-size:12px;line-height:1.2"><b>${fmt(x.v)}</b><br><span style="color:var(--muted);font-size:10.5px">${pct(x.v/tsem*100)} da sem.</span></span></div>`).join('')
        +'</div>';})();
     h+='<div class="panel"><h3>Recência de uso do App</h3><p class="sub">base apta · dias desde o último acesso registrado</p>'
        +(function(){const bk={};REC_ORDER.forEach(k=>bk[k]=0);B.forEach(a=>{bk[recBucket(a)]++;});const mx=Math.max(1,...REC_ORDER.map(k=>bk[k]));const tot=B.length||1;
@@ -472,12 +479,14 @@ window.DATA = /*__DATA__*/null;
       h+='</div><p class="sub" style="margin:8px 2px 0">Medalha = ranking do índice · número grande = índice (0–100) · barra de cada pilar = <b>atingimento</b> (atual ÷ alvo). Índice = Σ(peso × atingimento). Modelo completo na aba <b>Metodologia &amp; API</b>.</p>';
     }
     h+='<div class="sec">Unidades — base apta (App Treino)</div><div class="ugrid">';
-    h+=ALL.map(u=>{ const s=aptaStats(u.id); return `<div class="ucard"><div class="un">${u.nome}</div><div class="ual">${fmt(s.apta)} aptos · ${fmt(s.ativa)} ativos</div>
-      <div class="urow"><span>Uso do app</span><b>${s.apta?pct(s.app/s.apta*100):'—'}</b></div>
-      <div class="urow"><span>Treinos em dia</span><b>${fmt(s.emdia)}</b> <span style="color:var(--muted);font-size:10px">${s.apta?pct(s.emdia/s.apta*100):''}</span></div>
-      <div class="urow"><span>Treinos vencidos</span><b style="color:${s.venc>0?'#D64545':'#2D2D2D'}">${fmt(s.venc)}</b> <span style="color:var(--muted);font-size:10px">${s.apta?pct(s.venc/s.apta*100):''}</span></div>
-      <div class="urow"><span>Avaliações vencidas</span><b>${fmt(u.avaliacoesAtrasadas)}</b> <span style="color:var(--muted);font-size:10px">rede</span></div>
-      <div class="urow"><span>Atendimento</span><b>${fmt(u.acompanhamentoEm)}</b> <span style="color:var(--muted);font-size:10px">rede</span></div></div>`;}).join('')+'</div>';
+    // linha alinhada: rótulo | número | % (colunas fixas p/ escanear na vertical)
+    const urow3=(lb,val,pctTxt,col)=>`<div style="display:grid;grid-template-columns:1fr auto 54px;align-items:baseline;gap:8px;padding:6px 0;border-top:1px dashed var(--line)"><span style="font-size:12.5px;color:var(--muted)">${lb}</span><b style="font-size:13px;text-align:right${col?';color:'+col:''}">${val}</b><span style="font-size:11px;color:var(--muted);text-align:right">${pctTxt}</span></div>`;
+    h+=ALL.map(u=>{ const s=aptaStats(u.id); const uso=s.apta?s.app/s.apta*100:0; return `<div class="ucard"><div class="un">${u.nome}</div><div class="ual">${fmt(s.apta)} aptos · ${fmt(s.ativa)} ativos</div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:11px"><span style="font-size:12.5px;color:var(--muted)">Uso do app</span><b style="font-size:20px;color:#7A5AA8;line-height:1">${s.apta?pct(uso):'—'}</b></div>
+      <div class="bar" style="height:6px;margin:7px 0 3px"><i style="width:${uso}%;background:#7A5AA8"></i></div>
+      ${urow3('Treinos em dia',fmt(s.emdia),s.apta?pct(s.emdia/s.apta*100):'',s.emdia>0?'#3f8a52':'')}
+      ${urow3('Treinos vencidos',fmt(s.venc),s.apta?pct(s.venc/s.apta*100):'',s.venc>0?'#D64545':'')}
+      ${urow3('Avaliações vencidas',fmt(u.avaliacoesAtrasadas),'rede','')}</div>`;}).join('')+'</div>';
     // % aval. em dia — UNIDADE: feitas / (feitas + vencidas). A Pacto não expõe avaliação por aluno.
     const avalCov=u=>{ const f=N(u.avaliacoesRealizadas), v=N(u.avaliacoesAtrasadas); return (f+v)>0 ? f/(f+v)*100 : null; };
     const cols=[['Unidade',''],['Público-alvo','Fitness'],['% c/ treino','público-alvo'],['Uso app','público-alvo'],['Em dia','público-alvo'],['Vencidos','público-alvo'],['Aval. feitas','rede'],['Aval. vencidas','rede'],['% aval. em dia','feitas ÷ (feitas+venc.)'],['Acompanh.','rede']];
@@ -663,6 +672,12 @@ window.DATA = /*__DATA__*/null;
   function treinoPill(v){ return v==='emdia'?'<span class="pill c-green">Em dia</span>':v==='vencido'?'<span class="pill c-red">Vencido</span>':'<span class="pill" style="background:#EEE;color:#999">—</span>'; }
   function contratoPill(d){ if(d==null) return '<span class="pill c-green">ativo</span>'; if(d<0) return '<span class="pill c-red">vencido</span>'; if(d<=30) return `<span class="pill c-amber">vence em ${d}d</span>`; if(d<=90) return `<span class="pill" style="background:#EEF1F6;color:#5a6b86">${d}d</span>`; return `<span class="pill c-green">${d}d</span>`; }
   function avatar(a){ const ini=iniciais(a.nome); return a.foto?`<span class="av">${ini}<img class="avimg" src="${esc(a.foto)}" onerror="this.remove()" alt=""></span>`:`<span class="av">${ini}</span>`; }
+  function avatarBig(a){ const ini=iniciais(a.nome); return a.foto?`<span class="av" style="width:48px;height:48px;font-size:15px">${ini}<img class="avimg" src="${esc(a.foto)}" onerror="this.remove()" alt=""></span>`:`<span class="av" style="width:48px;height:48px;font-size:15px">${ini}</span>`; }
+  const IC_MAIL='<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;flex:0 0 auto"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg>';
+  const IC_SEARCH='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>';
+  const IC_PHONE='<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;flex:0 0 auto"><path d="M6 3h3l2 5-2.6 1.5a11 11 0 0 0 5 5L15.9 13l5.1 2v3a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2Z"/></svg>';
+  const _tcase=s=>String(s||'').toLowerCase().replace(/(^|[\s'\-])([a-zà-ú])/g,(m,x,y)=>x+y.toUpperCase());
+  const profShort=n=>{ if(!n) return ''; const ps=NAOPROF(n); if(ps) return ps; const p=String(n).trim().split(/\s+/).filter(Boolean); return _tcase(p.length<=1?p[0]:p[0]+' '+p[p.length-1]); };
   // ---------- Modalidade (7 baldes, via contrato) ----------
   const MOD_ORDER=['Fitness','Agua','Luta','Ambos (Agua+Fitness)','Ambos (Agua+Luta)','Ambos (Fitness+Luta)','Ambos (Agua+Fitness+Luta)','Outros'];
   const MOD_LABEL={'Fitness':'Fitness','Agua':'Água','Luta':'Luta','Ambos (Agua+Fitness)':'Ambos · Água+Fitness','Ambos (Agua+Luta)':'Ambos · Água+Luta','Ambos (Fitness+Luta)':'Ambos · Fitness+Luta','Ambos (Agua+Fitness+Luta)':'Ambos · Água+Fitness+Luta','Outros':'Outros'};
@@ -752,13 +767,12 @@ window.DATA = /*__DATA__*/null;
     const showUnit = state.unit==='all';
     const S=state.crmSort, TH=(k,l)=>`<th class="sortable" data-k="${k}">${l}${_sarr(S,k)}</th>`;
     let h='<div class="tbl rtable"><div class="scroll"><table><thead><tr>'
-      +TH('nome','Aluno')+(showUnit?TH('unitNome','Unidade'):'')+TH('professor','Professor')+TH('modalidade','Modalidade')+TH('fazTreino','Faz treino')+TH('treino','Treino')+TH('usaApp','Usa o app')+TH('recencia','Últ. acesso')+TH('contrato','Contrato')+TH('faixa','Faixa')+TH('isa','ISA')
+      +TH('nome','Aluno')+TH('professor','Professor')+TH('modalidade','Modalidade')+TH('treino','Treino')+TH('recencia','Últ. acesso')+TH('contrato','Contrato')+TH('faixa','Faixa')+TH('isa','ISA')
       +'</tr></thead><tbody>';
-    if(!rows.length){ h+=`<tr><td colspan="${showUnit?11:10}"><div class="empty" style="border:none;padding:26px">Nenhum aluno para estes filtros. Tente ampliar a seleção.</div></td></tr>`; }
+    if(!rows.length){ h+=`<tr><td colspan="8"><div class="empty" style="border:none;padding:26px">Nenhum aluno para estes filtros. Tente ampliar a seleção.</div></td></tr>`; }
     rows.forEach(a=>{ const f=FA[a.faixa]||['—','']; h+=`<tr class="click" data-mat="${esc(a.matricula)}">
-      <td data-label="Aluno"><div class="aluno-cell">${avatar(a)}<div><div class="nm">${esc(a.nome)||'—'}</div><div class="ct">${esc(a.email||'')}${a.telefone?(a.email?' · ':'')+esc(a.telefone):''}</div></div></div></td>`
-      +(showUnit?`<td data-label="Unidade" style="white-space:nowrap">${esc(a.unitNome)}</td>`:'')
-      +`<td class="muted" data-label="Professor">${esc(a.professor)||'—'}${NAOPROF(a.professor)==='Sem Professor'?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${a.motivoSemProf?('▸ '+esc(a.motivoSemProf)):'<i>motivo não registrado</i>'}</div>`:''}</td><td data-label="Modalidade">${modPill(a.modalidade)}</td><td data-label="Faz treino">${fazPill(a.fazTreino)}</td><td data-label="Treino">${treinoPill(a.treinoStatus)}</td><td data-label="Usa o app">${appPill(a.usaApp)}</td><td data-label="Últ. acesso">${recPill(a)}</td><td data-label="Contrato">${contratoPill(a.diasContrato)}</td>
+      <td data-label="Aluno"><div class="aluno-cell">${avatar(a)}<div><div class="nm">${esc(a.nome)||'—'}</div>${showUnit?`<div class="ct" style="color:#8a8a8a">${esc(a.unitNome)}</div>`:''}<div class="contacts">${a.email?`<span class="ct" title="${esc(a.email)}">${IC_MAIL}${esc(a.email)}</span>`:''}${a.telefone?`<span class="ct">${IC_PHONE}${esc(a.telefone)}</span>`:''}</div></div></div></td>`
+      +`<td class="muted" data-label="Professor" style="max-width:132px">${esc(profShort(a.professor))||'—'}${NAOPROF(a.professor)==='Sem Professor'?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${a.motivoSemProf?('▸ '+esc(a.motivoSemProf)):'<i>motivo não registrado</i>'}</div>`:''}</td><td data-label="Modalidade">${modPill(a.modalidade)}</td><td data-label="Treino">${treinoPill(a.treinoStatus)}</td><td data-label="Últ. acesso">${recPill(a)}</td><td data-label="Contrato">${contratoPill(a.diasContrato)}</td>
       <td data-label="Faixa"><span class="pill ${f[1]}">${f[0]}</span></td><td data-label="ISA">${isaPill(a)}</td></tr>`; });
     h+='</tbody></table></div>';
     h+=`<div class="pager"><span style="color:var(--muted);font-size:12.5px">${fmt(A.length)} aluno(s) · página ${state.crmPage} de ${pages}</span>
@@ -798,8 +812,7 @@ window.DATA = /*__DATA__*/null;
     const profOpts=[['all','Todos os professores']].concat([...new Set(Bf.map(a=>String(a.professor||'—')))].filter(Boolean).sort((x,y)=>x.localeCompare(y,'pt')).map(p=>[p,p]));
     const unitOpts=[['all','Todas as unidades']].concat(ALL.map(u=>[u.id,u.nome]));
     const modOpts=[['all','Todas as modalidades']].concat(MOD_ORDER.filter(k=>B.some(a=>modKey(a)===k)).map(k=>[k,MOD_LABEL[k]]));
-    h+='<div class="filterbar">'
-      +_fld('Buscar','<input class="finp" id="crmSearch" type="text" placeholder="nome ou e-mail…" value="'+esc(state.crmQ||'')+'">')
+    h+='<div class="filterbar"><div class="fbar-top"><div class="fsearch">'+IC_SEARCH+'<input id="crmSearch" type="text" placeholder="Buscar por nome ou e-mail…" value="'+esc(state.crmQ||'')+'"></div><button class="fclear" id="crmClear">Limpar filtros</button></div><div class="fgrid">'
       +_fld('Professor',_sel('crmProf',profOpts,state.crmProf))
       +_fld('Unidade',_sel('crmUnitSel',unitOpts,state.unit))
       +_fld('Contrato',_sel('crmContrato',[['all','Todos'],['vigente','Vigente'],['vencendo','Vence ≤30d'],['vencido','Vencido']],state.crmContrato))
@@ -812,7 +825,7 @@ window.DATA = /*__DATA__*/null;
       +_fld('Risco composto',_sel('crmComp',[['all','Todos'],['sim','presença↓ + uso↓']],state.crmComp))
       +_fld('Abandonado',_sel('crmAband',[['all','Todos'],['sim','sem acompanhamento']],state.crmAband))
       +_fld('Onboarding',_sel('crmOnb',[['all','Todos'],['sim','novo sem app']],state.crmOnb))
-      +'</div><p class="sub" style="margin:0 2px 4px">Clique numa linha para ver o Índice de Saúde (ISA) do aluno · no cabeçalho para ordenar.</p>';
+      +'</div></div><p class="sub" style="margin:0 2px 4px">Clique numa linha para ver o Índice de Saúde (ISA) do aluno · no cabeçalho para ordenar.</p>';
     h+='<div id="crmResults" style="margin-top:8px"></div>';
     el.innerHTML=h;
     el.querySelectorAll('.fsel').forEach(s=>s.onchange=()=>{ const id=s.dataset.sel, v=s.value;
@@ -820,6 +833,8 @@ window.DATA = /*__DATA__*/null;
       state[id]=v; state.crmPage=1; renderCRM(); });
     const sb=document.getElementById('crmSearch');
     if(sb){ sb.oninput=()=>{ state.crmQ=sb.value; state.crmPage=1; renderCRMResults(); }; }
+    const clr=document.getElementById('crmClear');
+    if(clr){ clr.onclick=()=>{ ['crmFaixa','crmPub','crmMod','crmProf','crmContrato','crmTreino','crmRec','crmIsa','crmComp','crmAband','crmOnb'].forEach(k=>state[k]='all'); state.crmQ=''; state.unit='all'; state.crmPage=1; renderChips(); renderGeral(); renderProfs(); renderScore(); renderCRM(); }; }
     renderCRMResults();
   }
 
@@ -866,21 +881,22 @@ window.DATA = /*__DATA__*/null;
     const a=(D.alunos||[]).find(x=>String(x.matricula)===String(mat)); if(!a) return;
     const v=isaScore(a),f=isaFaixa(v),s=isaSub(a);
     let h=`<button class="pmx" onclick="document.getElementById('pmodal').classList.remove('on')">&times;</button>`;
-    h+=`<div style="display:flex;align-items:center;gap:12px;margin:0 0 6px"><span class="av">${iniciais(a.nome)}</span><div style="flex:1"><h3 style="margin:0 0 3px;font-size:16px">${esc(a.nome)}</h3><p class="sub" style="margin:0">${uName(a.unit)} · ${modPill(a.modalidade)} · ${esc(a.professor)||'sem professor'}</p></div><div style="text-align:right"><div style="font-size:34px;font-weight:800;line-height:1;color:${f[1]}">${v}</div><span class="pill" style="background:${f[2]};color:${f[1]}">${f[0]}</span></div></div>`;
-    h+='<div style="font-size:12px;color:var(--muted);margin:14px 2px 6px">Por que este score (0–100 por dimensão)'+(a.presencaDias!=null?' · <span style="color:#0EA5A0">inclui presença (Frequência)</span>':'')+'</div>';
+    h+=`<div style="display:flex;align-items:center;gap:13px;margin:0 34px 14px 0"><span style="flex:0 0 auto">${avatarBig(a)}</span><div style="min-width:0"><h3 style="margin:0 0 4px;font-size:16px;line-height:1.25">${esc(a.nome)}</h3><div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted)">${esc(uName(a.unit))}${modPill(a.modalidade)}<span>${profShort(a.professor)||'sem professor'}</span></div></div></div>`;
+    h+=`<div style="display:flex;align-items:center;gap:14px;background:${f[2]};border-radius:12px;padding:12px 16px;margin-bottom:18px"><div style="font-size:36px;font-weight:800;line-height:1;color:${f[1]}">${v}</div><div style="line-height:1.3"><div style="font-weight:800;font-size:14px;color:${f[1]}">${f[0]}</div><div style="font-size:11.5px;color:${f[1]};opacity:.85">Índice de Saúde do Aluno · 0–100</div></div></div>`;
+    h+='<div style="font-size:12px;color:var(--muted);margin:0 2px 8px">Por que este score (0–100 por dimensão)'+(a.presencaDias!=null?' · <span style="color:#0EA5A0">inclui presença (Frequência)</span>':'')+'</div>';
     const _w=isaWeights(a);
     h+=Object.keys(_w).map(k=>{const val=s[k]||0;const c=val>=70?'#5BAD6F':val>=40?'#F2C94C':'#D64545';return `<div style="display:flex;align-items:center;gap:10px;margin:6px 0"><span style="width:172px;font-size:12px;color:var(--muted)">${ISA_DIMLBL[k]} <span style="font-size:10px">(${Math.round(_w[k]*100)}%)</span></span><div class="bar"><i style="width:${val}%;background:${c}"></i></div><span style="width:34px;text-align:right;font-size:12px;font-weight:700">${val}</span></div>`;}).join('');
-    h+=`<div class="urow" style="margin-top:14px"><span><b>Ação sugerida</b></span><b style="color:${f[1]}">${isaAcao(a)}</b></div>`;
-    h+=`<div style="font-size:12px;color:var(--muted);margin-top:14px;margin-bottom:4px">Dados do aluno</div><div class="tbl"><table style="width:100%;font-size:12.5px"><tbody>
-      <tr><td class="muted" style="padding:4px 0">Último acesso ao treino</td><td style="text-align:right">${a.recenciaDias!=null?a.recenciaDias+' dias atrás':'<span style="color:#999">sem registro</span>'}</td></tr>
-      <tr><td class="muted" style="padding:4px 0">Última presença (catraca)</td><td style="text-align:right">${a.presencaDias!=null?(a.presencaDias+' dias atrás'+(a.presencaCai===true?' · <span style="color:#D64545">frequência caindo</span>':'')):'<span style="color:#999">sem dado do Frequência</span>'}</td></tr>
-      ${riscoComposto(a)?'<tr><td colspan="2" style="padding:6px 0"><span class="pill c-red">⚠ Risco composto — presença↓ + uso↓</span></td></tr>':''}
-      <tr><td class="muted" style="padding:4px 0">Treino</td><td style="text-align:right">${treinoPill(a.treinoStatus)}</td></tr>
-      <tr><td class="muted" style="padding:4px 0">Usa o app (Pacto)</td><td style="text-align:right">${appPill(a.usaApp)}</td></tr>
-      <tr><td class="muted" style="padding:4px 0">Contrato</td><td style="text-align:right">${contratoPill(a.diasContrato)}</td></tr>
-      <tr><td class="muted" style="padding:4px 0">Contato</td><td style="text-align:right">${esc(a.email||'—')}${a.telefone?' · '+esc(a.telefone):''}</td></tr>
+    h+=`<div style="margin-top:18px;margin-bottom:6px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)">Ação sugerida</div><div style="background:${f[2]};color:${f[1]};border-radius:10px;padding:11px 14px;font-weight:700;font-size:13.5px">${isaAcao(a)}</div>`;
+    h+=`<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-top:18px;margin-bottom:6px">Dados do aluno</div><div class="tbl"><table style="width:100%;font-size:12.5px"><tbody>
+      <tr><td class="muted" style="padding:7px 12px">Último acesso ao treino</td><td style="text-align:right;padding:7px 12px">${a.recenciaDias!=null?a.recenciaDias+' dias atrás':'<span style="color:#999">sem registro</span>'}</td></tr>
+      <tr><td class="muted" style="padding:7px 12px">Última presença (catraca)</td><td style="text-align:right;padding:7px 12px">${a.presencaDias!=null?(a.presencaDias+' dias atrás'+(a.presencaCai===true?' · <span style="color:#D64545">frequência caindo</span>':'')):'<span style="color:#999">sem dado do Frequência</span>'}</td></tr>
+      ${riscoComposto(a)?'<tr><td colspan="2" style="padding:7px 12px"><span class="pill c-red">⚠ Risco composto — presença↓ + uso↓</span></td></tr>':''}
+      <tr><td class="muted" style="padding:7px 12px">Treino</td><td style="text-align:right;padding:7px 12px">${treinoPill(a.treinoStatus)}</td></tr>
+      <tr><td class="muted" style="padding:7px 12px">Usa o app (Pacto)</td><td style="text-align:right;padding:7px 12px">${appPill(a.usaApp)}</td></tr>
+      <tr><td class="muted" style="padding:7px 12px">Contrato</td><td style="text-align:right;padding:7px 12px">${contratoPill(a.diasContrato)}</td></tr>
+      <tr><td class="muted" style="padding:7px 12px">E-mail</td><td style="text-align:right;padding:7px 12px">${a.email?`<span style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;color:var(--ink)">${IC_MAIL}${esc(a.email)}</span>`:'<span style="color:#999">—</span>'}</td></tr>
+      <tr><td class="muted" style="padding:7px 12px">Telefone</td><td style="text-align:right;padding:7px 12px">${a.telefone?`<span style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;color:var(--ink)">${IC_PHONE}${esc(a.telefone)}</span>`:'<span style="color:#999">—</span>'}</td></tr>
     </tbody></table></div>`;
-    h+='<p class="sub" style="margin:12px 2px 0">ISA v1 — pesos ilustrativos (engajamento 35% · treino 30% · contrato 25% · vínculo 10%), a calibrar com o histórico de perdas. Frequência presencial e avaliação por aluno entram quando integradas.</p>';
     document.getElementById('pmodalc').innerHTML=h;
     document.getElementById('pmodal').classList.add('on');
   }
@@ -1005,6 +1021,13 @@ window.DATA = /*__DATA__*/null;
     document.getElementById('v-'+state.tab).classList.add('on');
   });
   document.getElementById('pmodal').onclick=e=>{ if(e.target.id==='pmodal') document.getElementById('pmodal').classList.remove('on'); };
+  // Aba "Metodologia & API" = modo desenvolvedor. Revela com #dev / ?dev=1 na URL (fica salvo).
+  (function(){ try{
+    var isDev = /(^|[?&#])dev(=1)?(&|$)/.test(location.hash+location.search) || localStorage.getItem('nadarte_dev')==='1';
+    if(/(^|[?&#])dev(=1)?(&|$)/.test(location.hash+location.search)) localStorage.setItem('nadarte_dev','1');
+    if(/nodev/.test(location.hash+location.search)){ localStorage.removeItem('nadarte_dev'); isDev=false; }
+    var mt=document.getElementById('tabMetodo'); if(mt && isDev) mt.style.display='';
+  }catch(e){} })();
   renderChips(); renderGeral(); renderUnidades(); renderProfs(); renderCRM(); renderScore(); renderMetodo();
 })();
 </script>
