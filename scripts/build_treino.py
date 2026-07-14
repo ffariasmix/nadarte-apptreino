@@ -5,7 +5,7 @@ build_treino.py — GATE + injeta os dados reais no template -> public/index.htm
 Uso: python scripts/build_treino.py        (valida e gera public/)
      python scripts/build_treino.py --check (so valida)
 """
-import os, sys, json, datetime
+import os, sys, json, datetime, hashlib, re, unicodedata
 
 RAW = "data/treino.json"
 TEMPLATE = "template/index.html"
@@ -13,6 +13,71 @@ OUT_DIR = "public"
 HIST = "history/serie.json"   # historico AGREGADO por dia (sem PII) — versionado no repo
 MARKER = "/*__DATA__*/null"
 AGENDA_FEED = "public/agenda_treino.json"   # Item 6 — fila do App Treino p/ a Agenda Tatica (origem='treino')
+ISA_HIST = "history/isa_history.json"       # Item 10 — snapshot semanal do ISA por aluno (hasheado) p/ backtest
+
+# ---- Item 10: porte fiel do ISA (mesma logica do template) para snapshot/backtest ----
+ISA_W4 = {"eng":0.35, "tr":0.30, "ct":0.25, "vin":0.10}                 # sem presenca
+ISA_W5 = {"pres":0.25, "eng":0.20, "tr":0.25, "ct":0.20, "vin":0.10}    # com presenca (ponte Frequencia)
+def _pmh(m):
+    return hashlib.sha256(str(m).encode("utf-8")).hexdigest()[:16]
+def _isnum(x):
+    return isinstance(x, (int, float))
+def _naoprof(nome):
+    s = unicodedata.normalize("NFD", str(nome or ""))
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn").upper()
+    u = " " + s + " "
+    if "PERSONAL EXTERNO" in u: return "Personal Externo"
+    if re.search(r"TREINO POR IA|\bIA\b", u): return "Treino por IA"
+    if re.search(r"PACTO|METODO DE GESTAO|\bGESTAO\b", u): return "Gestão"
+    if re.search(r"NAO QUER PROFESSOR|SEM PROFESSOR|SOMENTE NATACAO", u): return "Sem Professor"
+    return None
+def isa_sub(a):
+    d = a.get("recenciaDias")
+    eng = (100 if d<=7 else 80 if d<=14 else 55 if d<=30 else 30 if d<=60 else 10) if _isnum(d) \
+          else (55 if a.get("usaApp") is True else 20)
+    ts = a.get("treinoStatus")
+    tr = 100 if ts=="emdia" else (35 if ts=="vencido" else 10)
+    dc = a.get("diasContrato")
+    ct = (15 if dc<0 else 55 if dc<=30 else 82 if dc<=90 else 100) if _isnum(dc) else 75
+    np_ = _naoprof(a.get("professor")); prof = a.get("professor")
+    vin = 100 if (a.get("fazTreino") is True and prof and not np_) \
+          else (25 if np_=="Sem Professor" else (85 if a.get("fazTreino") is True else 40))
+    pd = a.get("presencaDias"); pres = None
+    if _isnum(pd):
+        pres = 100 if pd<=7 else 80 if pd<=14 else 50 if pd<=30 else 25 if pd<=60 else 8
+        if a.get("presencaCai") is True: pres = max(0, pres-20)
+    return {"pres":pres, "eng":eng, "tr":tr, "ct":ct, "vin":vin}
+def isa_score(a):
+    s = isa_sub(a); w = ISA_W5 if a.get("presencaDias") is not None else ISA_W4
+    return round(sum((s.get(k) or 0) * w[k] for k in w))
+
+def snapshot_isa(data):
+    """Snapshot SEMANAL do ISA por aluno (matricula HASHEADA, sem PII) p/ backtest
+    prospectivo. Chave = semana ISO (upsert: o ultimo build da semana vence).
+    Guarda [isa, eng, tr, ct, vin, pres(-1=n/a), recenciaDias(-1=n/a), presCai(0/1)]
+    — features suficientes p/ re-ajustar pesos contra o churn observado depois."""
+    apta = [a for a in data.get("alunos", []) if "fitness" in str(a.get("modalidade") or "").lower()]
+    y, w, _ = datetime.date.today().isocalendar()
+    wk_key = "%04d-W%02d" % (y, w)
+    snap = {}
+    for a in apta:
+        m = a.get("matricula")
+        if not m: continue
+        s = isa_sub(a)
+        snap[_pmh(m)] = [isa_score(a), s["eng"], s["tr"], s["ct"], s["vin"],
+                         (s["pres"] if s["pres"] is not None else -1),
+                         (a["recenciaDias"] if _isnum(a.get("recenciaDias")) else -1),
+                         (1 if a.get("presencaCai") is True else 0)]
+    hist = {}
+    if os.path.exists(ISA_HIST):
+        try: hist = json.load(open(ISA_HIST, encoding="utf-8"))
+        except Exception: hist = {}
+    hist[wk_key] = snap                                  # upsert da semana corrente
+    for k in sorted(hist.keys())[:-26]: hist.pop(k, None)   # mantem ~6 meses (26 semanas)
+    os.makedirs(os.path.dirname(ISA_HIST), exist_ok=True)
+    json.dump(hist, open(ISA_HIST, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    print("[isa] snapshot %s: %d aptos (hist %d semanas)" % (wk_key, len(snap), len(hist)), file=sys.stderr)
+    return snap
 
 def num(v):
     try: return float(v)
@@ -179,6 +244,7 @@ def main():
     open(os.path.join(OUT_DIR, "index.html"), "w", encoding="utf-8").write(out)
     print("OK -> %s/index.html" % OUT_DIR, file=sys.stderr)
     build_agenda_feed(data)   # Item 6 — publica a fila do App Treino p/ a Agenda Tatica
+    snapshot_isa(data)        # Item 10 — snapshot semanal do ISA por aluno p/ backtest prospectivo
 
 if __name__ == "__main__":
     main()

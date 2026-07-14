@@ -72,7 +72,7 @@ jobs:
           if [ -f history/serie.json ]; then
             git config user.name  "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add history/serie.json history/modalidade_cache.json 2>/dev/null || git add history/serie.json
-            git commit -m "hist: snapshot diario + cache modalidade" || echo "sem mudancas no historico"
+            git add history/serie.json history/modalidade_cache.json history/isa_history.json 2>/dev/null || git add history/serie.json
+            git commit -m "hist: snapshot diario + cache modalidade + isa (backtest)" || echo "sem mudancas no historico"
             git push || echo "nada a enviar"
           fi
