@@ -848,7 +848,7 @@ window.DATA = /*__DATA__*/null;
     const np=NAOPROF(a.professor);
     const vin = (a.fazTreino===true && a.professor && !np)?100:(np==='Sem Professor'?25:(a.fazTreino===true?85:40));
     const pd=a.presencaDias; let pres=null;
-    if(pd!=null){ pres=(pd<=7?100:pd<=14?80:pd<=30?50:pd<=60?25:8); if(a.presencaCai===true) pres=Math.max(0,pres-20); }
+    if(pd!=null){ pres=(pd<=7?100:pd<=14?70:pd<=30?50:pd<=60?25:8); if(a.presencaCai===true) pres=Math.max(0,pres-20); }  // ≤14d: 80→70 (backtest: churn salta p/ 54% em 1 sem s/ vir)
     return {pres,eng,tr,ct,vin};
   }
   function isaScore(a){const s=isaSub(a),w=isaWeights(a);let v=0;for(const k in w)v+=(s[k]||0)*w[k];return Math.round(v);}

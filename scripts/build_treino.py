@@ -44,7 +44,7 @@ def isa_sub(a):
           else (25 if np_=="Sem Professor" else (85 if a.get("fazTreino") is True else 40))
     pd = a.get("presencaDias"); pres = None
     if _isnum(pd):
-        pres = 100 if pd<=7 else 80 if pd<=14 else 50 if pd<=30 else 25 if pd<=60 else 8
+        pres = 100 if pd<=7 else 70 if pd<=14 else 50 if pd<=30 else 25 if pd<=60 else 8  # ≤14d: 80→70 (backtest)
         if a.get("presencaCai") is True: pres = max(0, pres-20)
     return {"pres":pres, "eng":eng, "tr":tr, "ct":ct, "vin":vin}
 def isa_score(a):
@@ -88,7 +88,8 @@ def num(v):
 # {unidade,matricula,nome,cat,foto,faixa,usaApp,treinoVencido}. Publicamos exatamente
 # esse formato: o motor faz o dedup (1 aluno = 1 card), soma pontos de CRM aos sinais
 # de frequencia do mesmo aluno, pontua e distribui em blocos. Sem alterar a engine.
-# Gatilho de card = sinal ACIONAVEL (faixa risco OU treino vencido). morno/sem-app
+# Gatilho de card = sinal ACIONAVEL (faixa risco, treino vencido OU abandono de app:
+# vem a academia mas largou o treino no app). morno/sem-app
 # NAO disparam card sozinhos (o motor promove todo candidato abaixo do teto, entao
 # alimenta-los encheria a Agenda com ruido de baixo valor); eles seguem no payload
 # apenas como enriquecimento de quem ja passou pelo gatilho. recenciaDias/presencaCai
@@ -108,16 +109,21 @@ def build_agenda_feed(data):
         faixa = a.get("faixa")
         venc = a.get("treinoStatus") == "vencido"
         ua = a.get("usaApp")
-        # Gatilho de card = sinal ACIONAVEL: faixa risco OU treino vencido.
+        rec = a.get("recenciaDias")
+        pd = a.get("presencaDias")
+        # Abandono PURO de app: VEM a academia (presenca recente, <=14d) mas largou o
+        # treino no app (>=30d sem acessar). A frequencia nao ve (ele esta vindo); so o
+        # App Treino enxerga. Vira gatilho proprio -> card 'reengajar' no motor.
+        app_parado = (isn(pd) and pd <= 14) and (isn(rec) and rec >= 30)
+        # Gatilho de card = sinal ACIONAVEL: faixa risco, treino vencido OU abandono de app.
         # (morno/sem-app entram no payload como enriquecimento de quem ja passou por
         #  este filtro, mas nunca disparam card sozinhos -> evita encher o teto com ruido.)
-        if not (faixa == "risco" or venc):
+        if not (faixa == "risco" or venc or app_parado):
             continue
-        rec = a.get("recenciaDias")
         crm.append({
             "unidade": slug, "matricula": str(a.get("matricula") or ""),
             "nome": a.get("nome") or "", "cat": "fitness", "foto": a.get("foto") or "",
-            "faixa": faixa, "usaApp": ua, "treinoVencido": venc,
+            "faixa": faixa, "usaApp": ua, "treinoVencido": venc, "appParado": app_parado,
             "recenciaDias": rec if isn(rec) else None,
             "presencaCai": (a.get("presencaCai") is True),
         })
