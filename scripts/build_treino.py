@@ -13,6 +13,7 @@ OUT_DIR = "public"
 HIST = "history/serie.json"   # historico AGREGADO por dia (sem PII) — versionado no repo
 MARKER = "/*__DATA__*/null"
 AGENDA_FEED = "public/agenda_treino.json"   # Item 6 — fila do App Treino p/ a Agenda Tatica (origem='treino')
+APP_STATUS  = "public/app_status.json"      # Pedido 2 (Agenda) — status de app do roster COMPLETO p/ o Prontuario 360
 ISA_HIST = "history/isa_history.json"       # Item 10 — snapshot semanal do ISA por aluno (hasheado) p/ backtest
 
 # ---- Item 10: porte fiel do ISA (mesma logica do template) para snapshot/backtest ----
@@ -137,6 +138,28 @@ def build_agenda_feed(data):
     print("[agenda] %s: %d candidatos CRM p/ o motor %s" % (AGENDA_FEED, len(crm), porf), file=sys.stderr)
     return feed
 
+# ---- Pedido 2 (Agenda): status de app do ROSTER COMPLETO p/ o Prontuario 360 ----
+# Um registro por aluno ATIVO (nao so os acionaveis): unidade (slug) + matricula +
+# usaApp (true/false/null quando a Pacto falha) + treinoVencido. A Agenda usa o que vier.
+def build_app_status(data):
+    al = data.get("alunos", [])
+    out = []
+    for a in al:
+        slug = AG_SLUG.get(a.get("unit"))
+        m = a.get("matricula")
+        if not slug or not m:
+            continue
+        out.append({
+            "unidade": slug, "matricula": str(m),
+            "usaApp": a.get("usaApp"),                          # True/False/None (desconhecido)
+            "treinoVencido": (a.get("treinoStatus") == "vencido"),
+        })
+    feed = {"gerado": datetime.date.today().isoformat(), "alunos": out}
+    os.makedirs(os.path.dirname(APP_STATUS), exist_ok=True)
+    json.dump(feed, open(APP_STATUS, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    print("[app_status] %s: %d alunos (roster completo)" % (APP_STATUS, len(out)), file=sys.stderr)
+    return feed
+
 def snapshot(data):
     """Monta o snapshot AGREGADO de hoje (sem PII) para a serie historica."""
     unis = data.get("unidades", [])
@@ -250,6 +273,7 @@ def main():
     open(os.path.join(OUT_DIR, "index.html"), "w", encoding="utf-8").write(out)
     print("OK -> %s/index.html" % OUT_DIR, file=sys.stderr)
     build_agenda_feed(data)   # Item 6 — publica a fila do App Treino p/ a Agenda Tatica
+    build_app_status(data)    # Pedido 2 — status de app do roster completo p/ o Prontuario da Agenda
     snapshot_isa(data)        # Item 10 — snapshot semanal do ISA por aluno p/ backtest prospectivo
 
 if __name__ == "__main__":
