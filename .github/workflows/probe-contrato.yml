@@ -1,0 +1,28 @@
+name: Probe contrato
+
+on:
+  workflow_dispatch:
+    inputs:
+      unit:
+        description: "Unidade (716Norte/905Sul/604Norte/LagoNorte/LagoSul/Natal) — vazio = primeira com chave"
+        type: string
+        default: ""
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Probe /v1/contrato/matricula
+        env:
+          PACTO_KEY_716NORTE: ${{ secrets.PACTO_KEY_716NORTE }}
+          PACTO_KEY_905SUL:    ${{ secrets.PACTO_KEY_905SUL }}
+          PACTO_KEY_604NORTE:  ${{ secrets.PACTO_KEY_604NORTE }}
+          PACTO_KEY_LAGONORTE: ${{ secrets.PACTO_KEY_LAGONORTE }}
+          PACTO_KEY_LAGOSUL:   ${{ secrets.PACTO_KEY_LAGOSUL }}
+          PACTO_KEY_NATAL:     ${{ secrets.PACTO_KEY_NATAL }}
+          PROBE_UNIT: ${{ github.event.inputs.unit }}
+        run: python scripts/probe_contrato.py
