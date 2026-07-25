@@ -1445,25 +1445,25 @@
   "rede": {
    "usoApp": 41.3,
    "emDiaPct": 66.0,
-   "vencidos": 825,
+   "vencidos": 824,
    "avalVencidas": 506,
    "nota": 4.94,
-   "execSemana": 6792,
-   "ativos": 5009,
-   "engajado": 1093,
-   "morno": 3449,
-   "risco": 467,
+   "execSemana": 6797,
+   "ativos": 5016,
+   "engajado": 1089,
+   "morno": 3458,
+   "risco": 469,
    "semdado": 0,
-   "appSim": 1224,
-   "appNao": 3785,
+   "appSim": 1222,
+   "appNao": 3794,
    "appFalha": 0,
-   "fazTreino": 2712,
-   "naoFazTreino": 1228,
-   "aptos": 2349,
-   "recRecente": 1315,
-   "abandonados": 493,
-   "riscoComposto": 360,
-   "presencaCobertura": 2178
+   "fazTreino": 2550,
+   "naoFazTreino": 1139,
+   "aptos": 2345,
+   "recRecente": 1173,
+   "abandonados": 478,
+   "riscoComposto": 319,
+   "presencaCobertura": 2172
   },
   "unidades": [
    {
@@ -1483,9 +1483,9 @@
    {
     "id": "905Sul",
     "nome": "905 Sul",
-    "usoApp": 36.4,
+    "usoApp": 36.5,
     "emDiaPct": 76.0,
-    "nota": 4.98
+    "nota": 4.97
    },
    {
     "id": "LagoNorte",
