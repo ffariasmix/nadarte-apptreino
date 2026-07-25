@@ -270,11 +270,20 @@ def fetch_carteira(key, ulabel):
         extra = ""                       # filtro ignorado/indisponivel -> varredura completa
         first, total = fetch_page(0, extra)
 
+    # dedup por cliente: o mesmo cid pode aparecer em varias linhas (base historica
+    # instavel + RENOVACAO ANTECIPADA, que gera um contrato novo alem do que vai vencer).
+    # Em vez de "a 1a linha vence", fica com a MELHOR: 1o a ATIVA, depois a de maior
+    # fimContrato — ou seja, o contrato vigente/futuro, nunca o que esta vencendo.
     seen = {}
+    def _rank_row(it):
+        sit = strip_accents(str(it.get("situacao") or "")).upper()
+        return (1 if sit == "ATIVO" else 0, parse_date_ms(it.get("fimContrato")) or 0)
     def add(items):
         for it in items:
             cid = it.get("codigoCliente") or it.get("matricula")
-            if cid is not None and cid not in seen:
+            if cid is None:
+                continue
+            if cid not in seen or _rank_row(it) > _rank_row(seen[cid]):
                 seen[cid] = it
     add(first)
 
