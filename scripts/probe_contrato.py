@@ -63,36 +63,37 @@ def main():
     j = json.loads(body); c = j.get("content", j)
     lst = c if isinstance(c, list) else (c.get("content") if isinstance(c, dict) else [])
     print("clientes na página: %d" % len(lst))
+    DATE_HINT = ("data", "fim", "inic", "venc", "term", "vig", "contrat", "plano", "situac", "renov")
+    def datish(obj):
+        return {k: v for k, v in obj.items() if any(t in str(k).lower() for t in DATE_HINT)}
     rows = []
     for it in lst:
         mat = it.get("matricula") or it.get("codigoCliente")
         fm = parse_ms(it.get("fimContrato"))
-        rows.append((mat, fm, dias(fm)))
+        rows.append((mat, fm, dias(fm), it))
     perto = [r for r in rows if r[2] is not None and r[2] <= 10]     # <=10 dias ou vencido
     longe = [r for r in rows if r[2] is not None and r[2] > 90]
-    amostra = perto[:5] + longe[:2]
+    amostra = perto[:4] + longe[:2]
     print("perto de vencer (<=10d/vencido): %d · amostrando %d" % (len(perto), len(amostra)))
-    for mat, fm, dd in amostra:
-        print("\n---- matrícula %s · fimContrato(lista)=%s (%s dias) ----" % (mat, fm, dd))
-        st2, body2 = http_get(key, "/v1/contrato/matricula/%s" % mat)
-        print("  /v1/contrato/matricula -> HTTP %s" % st2)
-        if st2 != 200:
-            continue
-        try:
-            jj = json.loads(body2); cc = jj.get("content", jj)
-            itens = cc if isinstance(cc, list) else (cc.get("content") if isinstance(cc, dict) else [cc])
-            if not isinstance(itens, list):
-                itens = [itens]
-            print("  contratos retornados: %d" % len(itens))
-            for idx, x in enumerate(itens):
-                if not isinstance(x, dict):
-                    continue
-                datish = {k: v for k, v in x.items()
-                          if any(t in str(k).lower() for t in ("data", "fim", "inic", "venc", "term", "vig"))}
-                print("   contrato[%d] chaves = %s" % (idx, list(x.keys())))
-                print("   contrato[%d] datas  = %s" % (idx, json.dumps(datish, ensure_ascii=False, default=str)))
-        except Exception as e:
-            print("  erro ao parsear: %s" % e)
+    # 1) revela TODOS os campos de uma linha do /clientes/simples (uma vez)
+    if lst:
+        print("\n== TODAS as chaves de /clientes/simples[0] ==\n  %s" % list(lst[0].keys()))
+    for mat, fm, dd, it in amostra:
+        cid = it.get("codigoCliente") or mat
+        print("\n---- matrícula %s (cid %s) · fimContrato(lista)=%s (%s dias) ----" % (mat, cid, fm, dd))
+        print("  clientes/simples datas/contrato = %s" % json.dumps(datish(it), ensure_ascii=False, default=str))
+        # 2) /v1/cliente/{cid} — provavel dono da vigencia atual/futura
+        st3, body3 = http_get(key, "/v1/cliente/%s" % cid)
+        print("  /v1/cliente/%s -> HTTP %s" % (cid, st3))
+        if st3 == 200:
+            try:
+                jj = json.loads(body3); c3 = jj.get("content", jj)
+                obj = (c3[0] if isinstance(c3, list) and c3 else c3)
+                if isinstance(obj, dict):
+                    print("   cliente chaves = %s" % list(obj.keys()))
+                    print("   cliente datas/contrato = %s" % json.dumps(datish(obj), ensure_ascii=False, default=str)[:700])
+            except Exception as e:
+                print("   erro cliente: %s" % e)
 
 if __name__ == "__main__":
     main()
