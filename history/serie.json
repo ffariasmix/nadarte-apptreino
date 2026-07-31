@@ -1863,27 +1863,27 @@
  {
   "data": "2026-07-31",
   "rede": {
-   "usoApp": 41.7,
+   "usoApp": 41.5,
    "emDiaPct": 64.3,
-   "vencidos": 866,
+   "vencidos": 864,
    "avalVencidas": 507,
    "nota": 4.94,
-   "execSemana": 7162,
-   "ativos": 5090,
-   "engajado": 1112,
-   "morno": 3517,
-   "risco": 461,
+   "execSemana": 7174,
+   "ativos": 5124,
+   "engajado": 1117,
+   "morno": 3543,
+   "risco": 464,
    "semdado": 0,
-   "appSim": 1239,
-   "appNao": 3851,
+   "appSim": 1244,
+   "appNao": 3880,
    "appFalha": 0,
-   "fazTreino": 3362,
-   "naoFazTreino": 1598,
-   "aptos": 2382,
-   "recRecente": 1553,
-   "abandonados": 865,
-   "riscoComposto": 334,
-   "presencaCobertura": 2186
+   "fazTreino": 3346,
+   "naoFazTreino": 1594,
+   "aptos": 2403,
+   "recRecente": 1568,
+   "abandonados": 850,
+   "riscoComposto": 336,
+   "presencaCobertura": 2206
   },
   "unidades": [
    {
@@ -1903,7 +1903,7 @@
    {
     "id": "905Sul",
     "nome": "905 Sul",
-    "usoApp": 36.7,
+    "usoApp": 36.2,
     "emDiaPct": 75.0,
     "nota": 4.96
    },
