@@ -12,7 +12,9 @@ on:
         type: boolean
         default: false
   schedule:
-    - cron: "0 6 * * *"
+    # 12:30 UTC = 09:30 BRT. Movido de 03:00 BRT para fora da janela da Ocupação (03:00-09:00 BRT),
+    # evitando dividir a cota de rate-limit das chaves Pacto (handoff Coleta Única, 04/08/2026).
+    - cron: "30 12 * * *"
 
 concurrency:
   group: apptreino-build
