@@ -1863,27 +1863,27 @@
  {
   "data": "2026-07-31",
   "rede": {
-   "usoApp": 41.7,
+   "usoApp": 41.5,
    "emDiaPct": 64.3,
-   "vencidos": 866,
+   "vencidos": 864,
    "avalVencidas": 507,
    "nota": 4.94,
-   "execSemana": 7162,
-   "ativos": 5090,
-   "engajado": 1112,
-   "morno": 3517,
-   "risco": 461,
+   "execSemana": 7174,
+   "ativos": 5124,
+   "engajado": 1117,
+   "morno": 3543,
+   "risco": 464,
    "semdado": 0,
-   "appSim": 1239,
-   "appNao": 3851,
+   "appSim": 1244,
+   "appNao": 3880,
    "appFalha": 0,
-   "fazTreino": 3362,
-   "naoFazTreino": 1598,
-   "aptos": 2382,
-   "recRecente": 1553,
-   "abandonados": 865,
-   "riscoComposto": 334,
-   "presencaCobertura": 2186
+   "fazTreino": 3346,
+   "naoFazTreino": 1594,
+   "aptos": 2403,
+   "recRecente": 1568,
+   "abandonados": 850,
+   "riscoComposto": 336,
+   "presencaCobertura": 2206
   },
   "unidades": [
    {
@@ -1903,7 +1903,7 @@
    {
     "id": "905Sul",
     "nome": "905 Sul",
-    "usoApp": 36.7,
+    "usoApp": 36.2,
     "emDiaPct": 75.0,
     "nota": 4.96
    },
@@ -1926,6 +1926,216 @@
     "nome": "Natal/RN",
     "usoApp": 57.7,
     "emDiaPct": 43.0,
+    "nota": 5.0
+   }
+  ]
+ },
+ {
+  "data": "2026-08-01",
+  "rede": {
+   "usoApp": 41.6,
+   "emDiaPct": 63.0,
+   "vencidos": 915,
+   "avalVencidas": 341,
+   "nota": 4.94,
+   "execSemana": 5829,
+   "ativos": 5148,
+   "engajado": 1010,
+   "morno": 3237,
+   "risco": 428,
+   "semdado": 473,
+   "appSim": 1120,
+   "appNao": 3555,
+   "appFalha": 473,
+   "fazTreino": 448,
+   "naoFazTreino": 786,
+   "aptos": 2401,
+   "recRecente": 912,
+   "abandonados": 110,
+   "riscoComposto": 212,
+   "presencaCobertura": 2202
+  },
+  "unidades": [
+   {
+    "id": "604Norte",
+    "nome": "604 Norte",
+    "usoApp": 44.5,
+    "emDiaPct": 50.0,
+    "nota": 4.91
+   },
+   {
+    "id": "716Norte",
+    "nome": "716 Norte",
+    "usoApp": 67.5,
+    "emDiaPct": 55.0,
+    "nota": 4.94
+   },
+   {
+    "id": "905Sul",
+    "nome": "905 Sul",
+    "usoApp": 36.4,
+    "emDiaPct": 73.0,
+    "nota": 4.96
+   },
+   {
+    "id": "LagoNorte",
+    "nome": "Lago Norte",
+    "usoApp": 34.6,
+    "emDiaPct": 52.0,
+    "nota": 4.87
+   },
+   {
+    "id": "LagoSul",
+    "nome": "Lago Sul",
+    "usoApp": 15.6,
+    "emDiaPct": 83.0,
+    "nota": 4.95
+   },
+   {
+    "id": "Natal",
+    "nome": "Natal/RN",
+    "usoApp": 58.1,
+    "emDiaPct": 41.0,
+    "nota": 5.0
+   }
+  ]
+ },
+ {
+  "data": "2026-08-02",
+  "rede": {
+   "usoApp": 41.6,
+   "emDiaPct": 62.4,
+   "vencidos": 913,
+   "avalVencidas": 342,
+   "nota": 4.94,
+   "execSemana": 5876,
+   "ativos": 5139,
+   "engajado": 1027,
+   "morno": 3205,
+   "risco": 416,
+   "semdado": 491,
+   "appSim": 1140,
+   "appNao": 3508,
+   "appFalha": 491,
+   "fazTreino": 340,
+   "naoFazTreino": 862,
+   "aptos": 2404,
+   "recRecente": 510,
+   "abandonados": 0,
+   "riscoComposto": 121,
+   "presencaCobertura": 2200
+  },
+  "unidades": [
+   {
+    "id": "604Norte",
+    "nome": "604 Norte",
+    "usoApp": 44.5,
+    "emDiaPct": 48.0,
+    "nota": 4.9
+   },
+   {
+    "id": "716Norte",
+    "nome": "716 Norte",
+    "usoApp": 67.6,
+    "emDiaPct": 55.0,
+    "nota": 4.94
+   },
+   {
+    "id": "905Sul",
+    "nome": "905 Sul",
+    "usoApp": 36.6,
+    "emDiaPct": 73.0,
+    "nota": 4.96
+   },
+   {
+    "id": "LagoNorte",
+    "nome": "Lago Norte",
+    "usoApp": 34.4,
+    "emDiaPct": 51.0,
+    "nota": 4.88
+   },
+   {
+    "id": "LagoSul",
+    "nome": "Lago Sul",
+    "usoApp": 15.6,
+    "emDiaPct": 82.0,
+    "nota": 4.95
+   },
+   {
+    "id": "Natal",
+    "nome": "Natal/RN",
+    "usoApp": 58.1,
+    "emDiaPct": 41.0,
+    "nota": 5.0
+   }
+  ]
+ },
+ {
+  "data": "2026-08-03",
+  "rede": {
+   "usoApp": 41.7,
+   "emDiaPct": 62.7,
+   "vencidos": 894,
+   "avalVencidas": 342,
+   "nota": 4.94,
+   "execSemana": 5715,
+   "ativos": 5054,
+   "engajado": 993,
+   "morno": 3087,
+   "risco": 366,
+   "semdado": 608,
+   "appSim": 1090,
+   "appNao": 3356,
+   "appFalha": 608,
+   "fazTreino": 619,
+   "naoFazTreino": 420,
+   "aptos": 2383,
+   "recRecente": 66,
+   "abandonados": 0,
+   "riscoComposto": 14,
+   "presencaCobertura": 2180
+  },
+  "unidades": [
+   {
+    "id": "604Norte",
+    "nome": "604 Norte",
+    "usoApp": 44.5,
+    "emDiaPct": 51.0,
+    "nota": 4.9
+   },
+   {
+    "id": "716Norte",
+    "nome": "716 Norte",
+    "usoApp": 67.6,
+    "emDiaPct": 56.0,
+    "nota": 4.94
+   },
+   {
+    "id": "905Sul",
+    "nome": "905 Sul",
+    "usoApp": 36.6,
+    "emDiaPct": 73.0,
+    "nota": 4.96
+   },
+   {
+    "id": "LagoNorte",
+    "nome": "Lago Norte",
+    "usoApp": 34.5,
+    "emDiaPct": 50.0,
+    "nota": 4.88
+   },
+   {
+    "id": "LagoSul",
+    "nome": "Lago Sul",
+    "usoApp": 15.7,
+    "emDiaPct": 81.0,
+    "nota": 4.95
+   },
+   {
+    "id": "Natal",
+    "nome": "Natal/RN",
+    "usoApp": 58.1,
+    "emDiaPct": 41.0,
     "nota": 5.0
    }
   ]
