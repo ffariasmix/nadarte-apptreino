@@ -231,6 +231,16 @@ def gate(data):
     com_dado = [u for u in unis if u.get("totalAlunos")]
     if len(com_dado) < 3:
         problemas.append("poucas unidades com totalAlunos > 0: %d" % len(com_dado))
+    # Sanidade do STATUS DE TREINO por aluno: se o join colapsar (API instavel / matriculas
+    # desalinhadas), nao publica — mantem o ultimo bom. Ex.: incidente #76 (0 em dia / 0 vencido).
+    al = data.get("alunos", [])
+    if len(al) >= 500:
+        com_treino = sum(1 for a in al if a.get("treinoStatus") in ("emdia", "vencido"))
+        com_recencia = sum(1 for a in al if isinstance(a.get("recenciaDias"), (int, float)))
+        if com_treino < len(al) * 0.05:
+            problemas.append("status de treino praticamente ausente: %d/%d com treino (join quebrado?)" % (com_treino, len(al)))
+        if com_recencia < len(al) * 0.05:
+            problemas.append("recencia de uso praticamente ausente: %d/%d com registro" % (com_recencia, len(al)))
     return problemas
 
 def main():

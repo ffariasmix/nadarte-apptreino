@@ -270,10 +270,10 @@ def fetch_carteira(key, ulabel):
         extra = ""                       # filtro ignorado/indisponivel -> varredura completa
         first, total = fetch_page(0, extra)
 
-    # dedup por cliente: o mesmo cid pode aparecer em varias linhas (base historica
-    # instavel + RENOVACAO ANTECIPADA, que gera um contrato novo alem do que vai vencer).
-    # Em vez de "a 1a linha vence", fica com a MELHOR: 1o a ATIVA, depois a de maior
-    # fimContrato — ou seja, o contrato vigente/futuro, nunca o que esta vencendo.
+    # dedup por cliente: mantem a LINHA original (1a vista) — preservando matricula/identidade,
+    # que e a chave do join de status de treino. Para a RENOVACAO ANTECIPADA, quando outra linha
+    # do mesmo cliente tem contrato mais novo/ATIVO, adotamos SO as DATAS de contrato dela
+    # (nao trocamos a linha inteira). Assim o contrato vigente/futuro aparece SEM quebrar o treino.
     seen = {}
     def _rank_row(it):
         sit = strip_accents(str(it.get("situacao") or "")).upper()
@@ -283,8 +283,13 @@ def fetch_carteira(key, ulabel):
             cid = it.get("codigoCliente") or it.get("matricula")
             if cid is None:
                 continue
-            if cid not in seen or _rank_row(it) > _rank_row(seen[cid]):
+            if cid not in seen:
                 seen[cid] = it
+            elif _rank_row(it) > _rank_row(seen[cid]):
+                cur = seen[cid]
+                for f in ("inicioContrato", "fimContrato", "situacao", "situacaoContrato"):
+                    if it.get(f) is not None:
+                        cur[f] = it.get(f)
     add(first)
 
     n_pages = ((total + SIZE - 1) // SIZE + 2) if total else 450
