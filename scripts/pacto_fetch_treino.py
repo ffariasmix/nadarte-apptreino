@@ -396,9 +396,19 @@ def treino_status_map(key):
     for ep, status in (("alunos-treino-em-dia", "emdia"), ("alunos-treino-vencido", "vencido")):
         seen = -1
         for page in range(0, 20):  # 0-INDEXED (confirmado): comeca na pagina 0
-            lst = content(key, "/psec/treino-bi/%s/0?page=%d&size=1000" % (ep, page))
-            items = lst if isinstance(lst, list) else (lst.get("content") if isinstance(lst, dict) else None)
+            items = None
+            # pagina 0: re-tenta algumas vezes antes de aceitar "vazio" — a lista de treino
+            # voltando vazia por instabilidade da API foi a causa dos incidentes de "0 em dia".
+            for attempt in range(4 if page == 0 else 1):
+                lst = content(key, "/psec/treino-bi/%s/0?page=%d&size=1000" % (ep, page))
+                items = lst if isinstance(lst, list) else (lst.get("content") if isinstance(lst, dict) else None)
+                if items:
+                    break
+                if page == 0 and attempt < 3:
+                    time.sleep(1.5 * (attempt + 1))
             if not items:
+                if page == 0:
+                    print("[treino-status] %s: pagina 0 vazia apos re-tentativas (API instavel?)" % ep, file=sys.stderr)
                 break
             for it in items:
                 m = normmat(it.get("matricula"))

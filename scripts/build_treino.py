@@ -231,14 +231,20 @@ def gate(data):
     com_dado = [u for u in unis if u.get("totalAlunos")]
     if len(com_dado) < 3:
         problemas.append("poucas unidades com totalAlunos > 0: %d" % len(com_dado))
-    # Sanidade do STATUS DE TREINO por aluno: se o join colapsar (API instavel / matriculas
-    # desalinhadas), nao publica — mantem o ultimo bom. Ex.: incidente #76 (0 em dia / 0 vencido).
+    # Sanidade do STATUS DE TREINO por aluno: se a coleta colapsar (API Pacto instavel), nao
+    # publica — mantem o ultimo bom. Numa rede saudavel os DOIS lados (em dia / vencido) e a
+    # recencia tem centenas de registros. Checamos CADA lado separado: se um endpoint da Pacto
+    # vier vazio (ex.: 'treino em dia' = 0 com a rede normal), o outro nao pode mascarar.
     al = data.get("alunos", [])
     if len(al) >= 500:
-        com_treino = sum(1 for a in al if a.get("treinoStatus") in ("emdia", "vencido"))
+        com_emdia = sum(1 for a in al if a.get("treinoStatus") == "emdia")
+        com_venc = sum(1 for a in al if a.get("treinoStatus") == "vencido")
         com_recencia = sum(1 for a in al if isinstance(a.get("recenciaDias"), (int, float)))
-        if com_treino < len(al) * 0.05:
-            problemas.append("status de treino praticamente ausente: %d/%d com treino (join quebrado?)" % (com_treino, len(al)))
+        PISO = 30   # piso absoluto por lado — saudavel tem centenas; colapso vem perto de 0
+        if com_emdia < PISO:
+            problemas.append("lista 'treino em dia' vazia/colapsada: %d (endpoint Pacto falhou?)" % com_emdia)
+        if com_venc < PISO:
+            problemas.append("lista 'treino vencido' vazia/colapsada: %d (endpoint Pacto falhou?)" % com_venc)
         if com_recencia < len(al) * 0.05:
             problemas.append("recencia de uso praticamente ausente: %d/%d com registro" % (com_recencia, len(al)))
     return problemas
@@ -285,6 +291,43 @@ def main():
     build_agenda_feed(data)   # Item 6 — publica a fila do App Treino p/ a Agenda Tatica
     build_app_status(data)    # Pedido 2 — status de app do roster completo p/ o Prontuario da Agenda
     snapshot_isa(data)        # Item 10 — snapshot semanal do ISA por aluno p/ backtest prospectivo
+    build_indicadores(data)   # feed AGREGADO (sem PII) p/ o assistente do Commander Center
+
+
+def build_indicadores(data):
+    """indicadores.json — agregado SEGURO (sem PII) p/ o assistente do Commander Center.
+    Reusa snapshot() (a MESMA serie agregada do historico do painel): nada de aluno individual."""
+    try:
+        snap = snapshot(data)
+        rede = snap.get("rede", {}) or {}
+        manchetes = {
+            "baseAtiva": rede.get("ativos"),
+            "aptosApp": rede.get("aptos"),
+            "usoAppPct": rede.get("usoApp"),
+            "treinosEmDiaPct": rede.get("emDiaPct"),
+            "treinosVencidos": rede.get("vencidos"),
+            "avaliacoesVencidas": rede.get("avalVencidas"),
+            "notaTreino": rede.get("nota"),
+            "engajado": rede.get("engajado"),
+            "morno": rede.get("morno"),
+            "risco": rede.get("risco"),
+            "escopo": "Rede (unidades com App Treino; agregado, sem dados de aluno individual)",
+        }
+        idx = {
+            "_painel": "crm",
+            "_gerado": data.get("gerado_em"),
+            "_data": snap.get("data"),
+            "manchetes": manchetes,
+            "rede": rede,
+            "unidades": snap.get("unidades", []),
+        }
+        json.dump(idx, open(os.path.join(OUT_DIR, "indicadores.json"), "w", encoding="utf-8"),
+                  ensure_ascii=False, separators=(",", ":"))
+        print("[indicadores] crm: base=%s usoApp=%s emDia=%s venc=%s (engaj/morno/risco %s/%s/%s)" % (
+            rede.get("ativos"), rede.get("usoApp"), rede.get("emDiaPct"), rede.get("vencidos"),
+            rede.get("engajado"), rede.get("morno"), rede.get("risco")), file=sys.stderr)
+    except Exception as e:
+        print("[indicadores] falhou (nao bloqueia): %s" % e, file=sys.stderr)
 
 if __name__ == "__main__":
     main()
