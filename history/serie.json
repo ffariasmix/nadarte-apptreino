@@ -2629,5 +2629,75 @@
     "nota": 5.0
    }
   ]
+ },
+ {
+  "data": "2026-08-12",
+  "rede": {
+   "usoApp": 44.5,
+   "emDiaPct": 65.7,
+   "vencidos": 826,
+   "avalVencidas": 342,
+   "nota": 4.94,
+   "execSemana": 6063,
+   "ativos": 5101,
+   "engajado": 950,
+   "morno": 3044,
+   "risco": 382,
+   "semdado": 725,
+   "appSim": 1055,
+   "appNao": 3321,
+   "appFalha": 725,
+   "fazTreino": 300,
+   "naoFazTreino": 47,
+   "aptos": 2292,
+   "recRecente": 1498,
+   "abandonados": 67,
+   "riscoComposto": 0,
+   "presencaCobertura": 0
+  },
+  "unidades": [
+   {
+    "id": "604Norte",
+    "nome": "604 Norte",
+    "usoApp": 45.0,
+    "emDiaPct": 49.0,
+    "nota": 4.88
+   },
+   {
+    "id": "716Norte",
+    "nome": "716 Norte",
+    "usoApp": 67.2,
+    "emDiaPct": 53.0,
+    "nota": 4.95
+   },
+   {
+    "id": "905Sul",
+    "nome": "905 Sul",
+    "usoApp": 45.5,
+    "emDiaPct": 84.0,
+    "nota": 4.95
+   },
+   {
+    "id": "LagoNorte",
+    "nome": "Lago Norte",
+    "usoApp": 33.5,
+    "emDiaPct": 51.0,
+    "nota": 4.86
+   },
+   {
+    "id": "LagoSul",
+    "nome": "Lago Sul",
+    "usoApp": 15.1,
+    "emDiaPct": 86.0,
+    "nota": 4.87
+   },
+   {
+    "id": "Natal",
+    "nome": "Natal/RN",
+    "usoApp": 57.0,
+    "emDiaPct": 46.0,
+    "nota": 5.0
+   }
+  ]
  }
 ]
