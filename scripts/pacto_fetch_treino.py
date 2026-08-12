@@ -32,10 +32,25 @@ _d = (os.environ.get("PACTO_DIAG") or "").strip().lower()
 DIAG = _d not in ("", "false", "0", "no")
 
 # ---------------------------------------------------------------- HTTP
+# Rate limit Pacto: 50 req/min por CHAVE. Reserva o próximo slot por chave (chaves diferentes não se
+# bloqueiam). Fica logo abaixo de 50/min pra não tomar 429 — que era o que inflava o build p/ 4h.
+import threading as _rt
+_rate_lock = _rt.Lock()
+_rate_next = {}
+RATE_MIN_INTERVAL = float(os.environ.get("PACTO_MIN_INTERVAL", "1.3"))   # 60/50=1.2s + margem
+def _rate_wait(key):
+    with _rate_lock:
+        t = max(time.monotonic(), _rate_next.get(key, 0.0))
+        _rate_next[key] = t + RATE_MIN_INTERVAL
+    d = t - time.monotonic()
+    if d > 0:
+        time.sleep(d)
+
 def http_get(key, path, tries=4, timeout=35):
     for i in range(tries):
         req = urllib.request.Request(BASE + path, headers={
             "Authorization": "Bearer " + key, "Accept": "application/json", "empresaId": "1"})
+        _rate_wait(key)   # respeita 50 req/min por chave (evita 429)
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return r.status, r.read().decode("utf-8", "replace")
