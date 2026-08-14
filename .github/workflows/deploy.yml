@@ -58,6 +58,10 @@ jobs:
           python scripts/crm_to_d1.py public/agenda_treino.json > crm.sql
           echo "Linhas SQL do CRM: $(wc -l < crm.sql)"
           npx --yes wrangler@3 d1 execute nadarte_agenda --remote --file=crm.sql
+          # app_status (Prontuario 360): usaApp/treinoVencido de TODOS os alunos ativos
+          python scripts/app_status_to_d1.py public/app_status.json > app_status.sql
+          echo "Linhas SQL do app_status: $(wc -l < app_status.sql)"
+          npx --yes wrangler@3 d1 execute nadarte_agenda --remote --file=app_status.sql
 
       - name: Publicar no Cloudflare Pages
         # publica automaticamente no cron diario; no run manual, so se marcar deploy=true
