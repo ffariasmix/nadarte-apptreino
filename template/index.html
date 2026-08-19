@@ -33,6 +33,9 @@
     /* rede de seguranca contra rolagem lateral. clip em vez de hidden: hidden
        quebraria position:sticky nos descendentes. hidden fica so de fallback. */
     overflow-x:hidden;overflow-x:clip}
+  /* A trava tem de estar no <html> tambem: so no body o documento continua rolando. */
+  html{overflow-x:hidden;overflow-x:clip}
+  .pop,.tip .pop,.tooltip,[role="tooltip"]{max-width:calc(100vw - 32px)}
   .wrap{max-width:1240px;margin:0 auto;padding:0 20px}
   header{background:linear-gradient(180deg,#fff,#fdfcfb);border-bottom:1px solid var(--line)}
   .hd{display:flex;align-items:center;gap:16px;padding:15px 0;flex-wrap:wrap}
