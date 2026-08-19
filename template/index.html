@@ -29,7 +29,10 @@
     --fs-caption:12px; /* legenda / subtexto */
     --fs-label:11px;   /* micro-rotulo (KPI, thead) */}
   *{box-sizing:border-box}html,body{margin:0}body{background:var(--bg);color:var(--ink);
-    font-family:var(--font-primary);font-size:14px;line-height:1.45}
+    font-family:var(--font-primary);font-size:14px;line-height:1.45;
+    /* rede de seguranca contra rolagem lateral. clip em vez de hidden: hidden
+       quebraria position:sticky nos descendentes. hidden fica so de fallback. */
+    overflow-x:hidden;overflow-x:clip}
   .wrap{max-width:1240px;margin:0 auto;padding:0 20px}
   header{background:linear-gradient(180deg,#fff,#fdfcfb);border-bottom:1px solid var(--line)}
   .hd{display:flex;align-items:center;gap:16px;padding:15px 0;flex-wrap:wrap}
@@ -71,7 +74,7 @@
   td{padding:11px 10px;border-bottom:1px solid var(--line)}tr:last-child td{border:none}
   .tbl{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}.scroll{overflow-x:auto}
   .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
-  .hbtn{font-size:11.5px;font-weight:600;padding:4px 12px;border-radius:999px;border:1px solid var(--color-border,#E7E3DD);background:var(--color-surface,#fff);color:var(--muted,#6B7280);cursor:pointer}
+  .hbtn{font-size:11.5px;font-weight:600;padding:8px 12px;border-radius:999px;border:1px solid var(--color-border,#E7E3DD);background:var(--color-surface,#fff);color:var(--muted,#6B7280);cursor:pointer;min-height:34px}
   .hbtn.on{background:#7A5AA8;border-color:#7A5AA8;color:#fff}
   [data-theme="dark"] .hbtn{background:#26241f;border-color:#403c37;color:#b8b2a8}
   [data-theme="dark"] .hbtn.on{background:#7A5AA8;border-color:#7A5AA8;color:#fff}
@@ -107,7 +110,7 @@
   .srch{border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:12.5px;font-family:inherit;min-width:180px;flex:1;max-width:280px}
   .srch:focus{outline:none;border-color:var(--orange)}
   .pager{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;flex-wrap:wrap;border-top:1px solid var(--line)}
-  .pbtn{background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer;font-family:inherit}
+  .pbtn{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer;font-family:inherit;min-height:34px}
   .pbtn:disabled{opacity:.4;cursor:default}
   .stack{display:flex;height:12px;border-radius:6px;overflow:hidden;margin-top:6px}
   tbody tr.click{cursor:pointer}tbody tr.click:hover{background:var(--soft)}
@@ -117,6 +120,34 @@
   .modalc{background:#fff;border-radius:16px;max-width:640px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.3);max-height:88vh;overflow:auto;position:relative}
   .pmx{position:absolute;top:14px;right:14px;width:30px;height:30px;border-radius:50%;background:var(--soft);border:1px solid var(--line);color:var(--muted);font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;z-index:3}
   .pmx:hover{background:var(--line);color:var(--ink)}
+  /* ---- distribuicao por modalidade: 3 colunas fluidas (nada de min-width fixo) ---- */
+  .moddist{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.6fr) minmax(0,auto);align-items:center;gap:12px;margin:9px 0}
+  .moddist .mdl{font-size:12.5px;font-weight:600;min-width:0;overflow-wrap:anywhere}
+  .moddist .mdb{height:8px;border-radius:5px;background:#EEEAE4;overflow:hidden;display:flex;min-width:0}
+  .moddist .mdv{text-align:right;font-size:12px;min-width:0;white-space:nowrap}
+  /* Modo card das tabelas largas. Duas reguas porque o parque tem dois pontos
+     de dor: o celular (qualquer tabela de 5+ colunas) e o iPad em retrato, onde
+     uma tabela de 840px tambem nao cabe e a @media de 640px nao socorre.
+       .rtable    -> vira card ate 640px
+       .rtable-lg -> vira card ate 1000px (tabelas muito largas) */
+  @media(max-width:1000px){
+    .rtable-lg table,.rtable-lg thead,.rtable-lg tbody,.rtable-lg tr,.rtable-lg td{display:block}
+    .rtable-lg thead{position:absolute;left:-9999px;height:0;overflow:hidden}
+    .rtable-lg tr{border:1px solid var(--line);border-radius:12px;margin:0 6px 10px;padding:4px 2px;background:var(--card)}
+    .rtable-lg td{border:none;padding:7px 12px;display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:right}
+    .rtable-lg td::before{content:attr(data-label);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);text-align:left;flex:0 0 auto}
+    .rtable-lg td:first-child{justify-content:flex-start;text-align:left}
+    .rtable-lg td:first-child::before{display:none}
+    .rtable-lg .pager{flex-direction:column;align-items:stretch;gap:8px}
+    .rtable-lg td>*{min-width:0}
+    .rtable-lg .aluno-cell{max-width:100%}
+    .rtable-lg .aluno-cell .contacts .ct{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+    /* no tablet os cards podem ficar lado a lado: aproveita a largura */
+    .rtable-lg tbody{display:grid;grid-template-columns:1fr 1fr;gap:0}
+  }
+  @media(max-width:640px){
+    .rtable-lg tbody{grid-template-columns:1fr}
+  }
   @media(max-width:900px){.kgrid{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}.ugrid{grid-template-columns:1fr}.road{grid-template-columns:1fr}}
   @media(max-width:640px){
     .fgrid{grid-template-columns:1fr 1fr}
@@ -128,6 +159,17 @@
     .rtable td:first-child{justify-content:flex-start;text-align:left}
     .rtable td:first-child::before{display:none}
     .rtable .pager{flex-direction:column;align-items:stretch;gap:8px}
+    /* no modo card o valor da direita nao pode empurrar o rotulo para fora */
+    .rtable td>*{min-width:0}
+    .rtable .aluno-cell{max-width:100%}
+    .rtable .aluno-cell .contacts .ct{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+    /* a barra de filtros deixa de ser fixa: no celular ela ocupava um terco da tela */
+    .filters{position:static}
+    /* barra + valor descem para a linha de baixo, ocupando a largura toda */
+    .moddist{grid-template-columns:minmax(0,1fr) auto;gap:5px 10px}
+    .moddist .mdl{order:1}
+    .moddist .mdv{order:2}
+    .moddist .mdb{order:3;grid-column:1/-1}
   }
   @media(max-width:460px){.kgrid{grid-template-columns:1fr}.asof{margin-left:0;width:100%}.fgrid{grid-template-columns:1fr}.fbar-top{flex-direction:column}}
   /* botão de alternar tema */
@@ -491,15 +533,15 @@ window.DATA = /*__DATA__*/null;
     // % aval. em dia — UNIDADE: feitas / (feitas + vencidas). A Pacto não expõe avaliação por aluno.
     const avalCov=u=>{ const f=N(u.avaliacoesRealizadas), v=N(u.avaliacoesAtrasadas); return (f+v)>0 ? f/(f+v)*100 : null; };
     const cols=[['Unidade',''],['Público-alvo','Fitness'],['% c/ treino','público-alvo'],['Uso app','público-alvo'],['Em dia','público-alvo'],['Vencidos','público-alvo'],['Aval. feitas','rede'],['Aval. vencidas','rede'],['% aval. em dia','feitas ÷ (feitas+venc.)'],['Acompanh.','rede']];
-    h+='<div class="sec">Tabela comparativa</div><div class="tbl"><div class="scroll"><table><thead><tr>'+cols.map(c=>`<th style="white-space:nowrap">${c[0]}${c[1]?`<div style="font-weight:500;font-size:9.5px;color:var(--muted);text-transform:none;letter-spacing:0">${c[1]}</div>`:''}</th>`).join('')+'</tr></thead><tbody>';
+    h+='<div class="sec">Tabela comparativa</div><div class="tbl rtable rtable-lg"><div class="scroll"><table><thead><tr>'+cols.map(c=>`<th style="white-space:nowrap">${c[0]}${c[1]?`<div style="font-weight:500;font-size:9.5px;color:var(--muted);text-transform:none;letter-spacing:0">${c[1]}</div>`:''}</th>`).join('')+'</tr></thead><tbody>';
     h+=ALL.map(u=>{ const s=aptaStats(u.id); const av=avalCov(u); return `<tr><td style="white-space:nowrap"><b>${u.nome}</b></td>
-      <td>${fmt(s.apta)}</td>
-      <td><b>${s.apta?pct(s.comT/s.apta*100):'—'}</b></td>
-      <td>${s.apta?pct(s.app/s.apta*100):'—'}</td><td>${fmt(s.emdia)}</td>
-      <td><span class="pill ${s.venc>0?'c-red':'c-green'}">${fmt(s.venc)}</span></td>
-      <td>${fmt(u.avaliacoesRealizadas)}</td><td><span class="pill ${N(u.avaliacoesAtrasadas)>0?'c-amber':'c-green'}">${fmt(u.avaliacoesAtrasadas)}</span></td>
-      <td><b>${av==null?'—':pct(av)}</b></td>
-      <td>${fmt(u.acompanhamentoEm)}</td></tr>`; }).join('');
+      <td data-label="Público-alvo">${fmt(s.apta)}</td>
+      <td data-label="% c/ treino"><b>${s.apta?pct(s.comT/s.apta*100):'—'}</b></td>
+      <td data-label="Uso app">${s.apta?pct(s.app/s.apta*100):'—'}</td><td data-label="Em dia">${fmt(s.emdia)}</td>
+      <td data-label="Vencidos"><span class="pill ${s.venc>0?'c-red':'c-green'}">${fmt(s.venc)}</span></td>
+      <td data-label="Aval. feitas">${fmt(u.avaliacoesRealizadas)}</td><td data-label="Aval. vencidas"><span class="pill ${N(u.avaliacoesAtrasadas)>0?'c-amber':'c-green'}">${fmt(u.avaliacoesAtrasadas)}</span></td>
+      <td data-label="% aval. em dia"><b>${av==null?'—':pct(av)}</b></td>
+      <td data-label="Acompanh.">${fmt(u.acompanhamentoEm)}</td></tr>`; }).join('');
     h+='</tbody></table></div></div>';
     h+='<div class="note"><b>Base:</b> Público-alvo, % c/ treino, Uso app, Em dia e Vencidos são <b>por aluno sobre a base apta</b> (planos com Fitness) — mesma fonte da Visão Geral e do CRM. Avaliações e Atendimento vêm do BI como <b>total da unidade</b> (a Pacto não expõe por aluno).</div>';
     document.getElementById('v-unidades').innerHTML=h;
@@ -599,14 +641,14 @@ window.DATA = /*__DATA__*/null;
       +`<div class="kpi"><div class="n"><span class="dot" style="background:#5BAD6F"></span>% ficha em dia (média)</div><div class="v">${pct(medEmDia)}</div><div class="s">média entre professores</div></div>`
       +`<div class="kpi"><div class="n"><span class="dot" style="background:#D64545"></span>Alunos com treino vencido</div><div class="v">${fmt(venc)}</div><div class="s">somados nas carteiras</div></div>`
       +'</div>';
-    h+='<div class="sec">Ranking de atuação <span style="font-weight:600;color:var(--muted);font-size:12px">— clique num professor para ver os alunos da carteira</span></div><div class="tbl"><div class="scroll"><table><thead><tr>'
-      +'<th>#</th>'+[['nome','Professor'],['unit','Unidade'],['carteiraReal','Carteira'],['comTreino','Alunos c/ treino'],['emDia','Em dia'],['vencidos','Vencidos'],['pctEmDia','% em dia'],['notaMedia','Nota'],['indice','Índice']].map(c=>`<th class="sortable" data-k="${c[0]}">${c[1]}${_sarr(PS,c[0])}</th>`).join('')+'</tr></thead><tbody>';
-    h+=P.map((p,i)=>`<tr class="click" data-pid="${esc(p.id)}"><td style="font-size:15px">${medal(i)}</td><td><div class="aluno-cell">${avatar(p)}<div><div class="nm">${esc(p.nome)||('Prof '+(p.id||''))}</div>${profAlertas(p).map(a=>`<span class="pill" style="background:${a[1]}18;color:${a[1]};font-size:9.5px;margin:2px 3px 0 0;padding:1px 7px">⚠ ${a[0]}</span>`).join('')}</div></div></td><td>${uName(p.unit)}</td>
-      <td><b>${fmt(p.carteiraReal||0)}</b></td><td>${fmt(p.comTreino)}</td><td>${fmt(p.emDia)}</td>
-      <td><span class="pill ${N(p.vencidos)>0?'c-red':'c-green'}">${fmt(p.vencidos)}</span></td>
-      <td>${pct(p.pctEmDia)}</td>
-      <td>${N(p.notaTotal)>0?('<b>'+(Math.round(N(p.notaMedia)*100)/100).toLocaleString('pt-BR')+'</b>★ <span style="color:var(--muted);font-size:11px">('+fmt(p.notaTotal)+')</span>'):'<span style="color:var(--muted)">—</span>'}</td>
-      <td><span class="pill" style="background:${bg(p.indice)};color:${col(p.indice)}">${p.indice}</span></td></tr>`).join('');
+    h+='<div class="sec">Ranking de atuação <span style="font-weight:600;color:var(--muted);font-size:12px">— clique num professor para ver os alunos da carteira</span></div><div class="tbl rtable rtable-lg"><div class="scroll"><table><thead><tr>'
+      +[['nome','Professor'],['unit','Unidade'],['carteiraReal','Carteira'],['comTreino','Alunos c/ treino'],['emDia','Em dia'],['vencidos','Vencidos'],['pctEmDia','% em dia'],['notaMedia','Nota'],['indice','Índice']].map(c=>`<th class="sortable" data-k="${c[0]}">${c[1]}${_sarr(PS,c[0])}</th>`).join('')+'</tr></thead><tbody>';
+    h+=P.map((p,i)=>`<tr class="click" data-pid="${esc(p.id)}"><td><div class="aluno-cell">${avatar(p)}<div><div class="nm"><span style="color:var(--muted);font-weight:700;margin-right:5px">${medal(i)}</span>${esc(p.nome)||('Prof '+(p.id||''))}</div>${profAlertas(p).map(a=>`<span class="pill" style="background:${a[1]}18;color:${a[1]};font-size:9.5px;margin:2px 3px 0 0;padding:1px 7px">⚠ ${a[0]}</span>`).join('')}</div></div></td><td data-label="Unidade">${uName(p.unit)}</td>
+      <td data-label="Carteira"><b>${fmt(p.carteiraReal||0)}</b></td><td data-label="Alunos c/ treino">${fmt(p.comTreino)}</td><td data-label="Em dia">${fmt(p.emDia)}</td>
+      <td data-label="Vencidos"><span class="pill ${N(p.vencidos)>0?'c-red':'c-green'}">${fmt(p.vencidos)}</span></td>
+      <td data-label="% em dia">${pct(p.pctEmDia)}</td>
+      <td data-label="Nota">${N(p.notaTotal)>0?('<b>'+(Math.round(N(p.notaMedia)*100)/100).toLocaleString('pt-BR')+'</b>★ <span style="color:var(--muted);font-size:11px">('+fmt(p.notaTotal)+')</span>'):'<span style="color:var(--muted)">—</span>'}</td>
+      <td data-label="Índice"><span class="pill" style="background:${bg(p.indice)};color:${col(p.indice)}">${p.indice}</span></td></tr>`).join('');
     h+='</tbody></table></div></div>';
     const totPseudo=PSEUDO_ORDER.reduce((a,k)=>a+pseudo[k].n,0);
     if(totPseudo){
@@ -648,8 +690,8 @@ window.DATA = /*__DATA__*/null;
     let h=`<button class="pmx" onclick="document.getElementById('pmodal').classList.remove('on')">&times;</button>`;
     h+=`<div style="display:flex;align-items:center;gap:12px;margin:0 0 14px">${avatar(prof)}<div><h3 style="margin:0 0 2px;font-size:16px">${esc(prof.nome)||'Professor'}</h3><p class="sub" style="margin:0">${uName(prof.unit)} · ${fmt(alunos.length)} alunos na carteira</p></div></div>`;
     if(!alunos.length){ h+='<div class="empty" style="border:none;padding:24px">Sem alunos vinculados nesta coleta.</div>'; }
-    else { h+='<div class="tbl"><div class="scroll" style="max-height:56vh"><table><thead><tr><th>Aluno</th><th>Usa app</th><th>Contrato</th><th>Faixa</th></tr></thead><tbody>'
-      +alunos.map(a=>{const f=FA[a.faixa]||['—','']; return `<tr><td><div class="aluno-cell"><span class="av">${iniciais(a.nome)}</span><div><div class="nm">${esc(a.nome)}</div><div class="ct">${esc(a.email||'')}</div></div></div></td><td>${appPill(a.usaApp)}</td><td>${contratoPill(a.diasContrato)}</td><td><span class="pill ${f[1]}">${f[0]}</span></td></tr>`;}).join('')
+    else { h+='<div class="tbl rtable"><div class="scroll" style="max-height:56vh"><table><thead><tr><th>Aluno</th><th>Usa app</th><th>Contrato</th><th>Faixa</th></tr></thead><tbody>'
+      +alunos.map(a=>{const f=FA[a.faixa]||['—','']; return `<tr><td><div class="aluno-cell"><span class="av">${iniciais(a.nome)}</span><div><div class="nm">${esc(a.nome)}</div><div class="ct">${esc(a.email||'')}</div></div></div></td><td data-label="Usa app">${appPill(a.usaApp)}</td><td data-label="Contrato">${contratoPill(a.diasContrato)}</td><td data-label="Faixa"><span class="pill ${f[1]}">${f[0]}</span></td></tr>`;}).join('')
       +'</tbody></table></div></div>'; }
     document.getElementById('pmodalc').innerHTML=h;
     document.getElementById('pmodal').classList.add('on');
@@ -694,12 +736,12 @@ window.DATA = /*__DATA__*/null;
     const appOf=k=>list.filter(a=>modKey(a)===k && a.usaApp===true).length;   // usam o app nessa modalidade
     let h='<div class="panel"><h3>Distribuição por modalidade</h3><p class="sub">público-alvo · barra cheia = usa o app · clara = ainda não usa — '+(state.unit==='all'?'rede':uName(state.unit))+'</p>';
     h+=MOD_ORDER.filter(k=>d[k]>0).map(k=>{ const cnt=d[k], app=appOf(k), pApp=cnt?app/cnt*100:0;
-      return `<div style="display:flex;align-items:center;gap:12px;margin:9px 0">
-      <div style="min-width:186px;font-size:12.5px;font-weight:600">${MOD_LABEL[k]}</div>
-      <div style="max-width:300px;flex:1;height:8px;border-radius:5px;background:#EEEAE4;overflow:hidden;display:flex" title="${fmt(app)} usam o app · faltam ${fmt(cnt-app)}">
+      return `<div class="moddist">
+      <div class="mdl">${MOD_LABEL[k]}</div>
+      <div class="mdb" title="${fmt(app)} usam o app · faltam ${fmt(cnt-app)}">
         <i style="height:100%;width:${app/max*100}%;background:${MOD_COLOR[k]}"></i>
         <i style="height:100%;width:${(cnt-app)/max*100}%;background:${MOD_COLOR[k]}40"></i></div>
-      <div style="min-width:150px;text-align:right;font-size:12px">
+      <div class="mdv">
         <b style="font-size:14px">${fmt(cnt)}</b> <span style="color:var(--muted);font-size:11px">(${pct(cnt/tot*100)})</span>
         <div style="color:var(--muted);font-size:11px">${pct(pApp)} no app · <b style="color:#B5731A">falta ${pct(100-pApp)}</b></div></div></div>`;}).join('');
     h+='</div>'; return h;
