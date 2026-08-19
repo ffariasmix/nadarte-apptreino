@@ -65,26 +65,15 @@ jobs:
 
 
       # ---- Porteiro de responsividade -------------------------------------
-      # Roda DEPOIS de gerar o HTML e ANTES de publicar. Mede a página num
-      # navegador de verdade, em celular/tablet/tablet-paisagem, e reprova se
-      # sobrar botão ou dado fora da tela. O linter estático não pega isso:
-      # ele deu 0 erro em três painéis que estavam quebrados no celular.
-      - name: Buscar o porteiro de responsividade
-        uses: actions/checkout@v4
-        with:
-          repository: ffariasmix/nadarte-dashboard-automacao
-          path: .porteiro
+      # Roda DEPOIS de gerar o HTML e ANTES de publicar. Mede a pagina num
+      # navegador de verdade e reprova se sobrar botao ou dado fora da tela.
+      # O porteiro e um arquivo unico e autocontido, copiado igual nos 7 paineis.
       - name: Instalar navegador
         run: |
-          cd .porteiro && npm i --no-save playwright
+          npm i --no-save playwright
           npx playwright install --with-deps chromium
-      - name: Conferir se o medidor esta confiavel
-        working-directory: .porteiro
-        run: node scripts/teste_medidor.mjs
       - name: Medir responsividade do painel gerado
-        run: |
-          node .porteiro/scripts/ux_mobile_lint.mjs public/index.html
-          node .porteiro/scripts/medir_responsivo.mjs --larguras 390,768,1024 --capturas ./capturas public/index.html
+        run: node scripts/porteiro_responsivo.mjs --larguras 390,768,1024 --capturas ./capturas public/index.html
       - name: Anexar capturas de quem reprovou
         if: failure()
         uses: actions/upload-artifact@v4
