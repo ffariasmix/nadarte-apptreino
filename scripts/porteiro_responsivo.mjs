@@ -2,7 +2,7 @@
 /**
  * porteiro_responsivo.mjs — o gate de responsividade dos painéis Nad'Arte.
  * ============================================================================
- * VERSÃO: 2026.08.19-1
+ * VERSÃO: 2026.08.20-1
  *
  * ARQUIVO ÚNICO E AUTOCONTIDO, DE PROPÓSITO.
  * Ele é copiado igual dentro de cada repositório de painel. A alternativa era
@@ -39,7 +39,7 @@
 import { readFileSync, existsSync, mkdirSync } from "node:fs";
 import { resolve, basename } from "node:path";
 
-export const VERSAO = "2026.08.19-1";
+export const VERSAO = "2026.08.20-1";
 
 // ============================================================================
 // PARTE 1 — LINTER ESTÁTICO (rápido; pega o que já conhecemos)
@@ -420,6 +420,23 @@ function medirNaPagina(largura) {
     return s.display === "none" || s.visibility === "hidden" || +s.opacity === 0;
   };
 
+  // Tabela em modo cartão joga o <thead> para -9999px DE PROPÓSITO: o rótulo de
+  // cada campo reaparece no `td::before { content: attr(data-label) }`. O dado
+  // não sumiu, mudou de lugar — e reprovar isso é acusar o conserto de ser o
+  // defeito. Foi o que aconteceu: o portão do Conversas nasceu vermelho e
+  // reprovou as três primeiras vezes por causa de 4 <th> corretos.
+  //
+  // Esta exceção só é segura porque a regra `card-sem-rotulo` do linter, que
+  // roda ANTES daqui e é bloqueante, garante que todo <td> tem data-label. Se
+  // aquela regra for afrouxada, esta exceção passa a esconder dado de verdade.
+  const ehCabecalhoDeCartao = (el) => {
+    const cab = el.closest && el.closest("thead");
+    if (!cab) return false;
+    const s = getComputedStyle(cab);
+    if (s.position !== "absolute") return false;
+    return parseFloat(s.height) === 0 || s.overflow === "hidden" || s.overflowY === "hidden";
+  };
+
   const descreve = (el) => {
     const r = el.getBoundingClientRect();
     const cls = typeof el.className === "string" && el.className ? "." + el.className.trim().split(/\s+/)[0] : "";
@@ -440,6 +457,7 @@ function medirNaPagina(largura) {
         if (invisivel(el)) return false;
         // O skip-link fica escondido fora da tela de propósito, é padrão de acessibilidade.
         if (/skip-link/.test(el.className || "")) return false;
+        if (ehCabecalhoDeCartao(el)) return false;
         if (dentroDeRolagemDeliberada(el)) return false;
         return r.right > largura + 2 || r.left < -2;
       })
@@ -462,6 +480,8 @@ const CASOS = [
     html: `<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><style>html,body{margin:0;overflow-x:hidden;overflow-x:clip;font:14px system-ui}.tabs{display:flex;gap:6px;white-space:nowrap}.tabs button{flex:0 0 auto;padding:10px 14px}</style><div class=tabs><button>Visao geral</button><button>Atendimento</button><button>Aquisicao e Campanhas</button></div>` },
   { nome: "rola dentro do card de propósito (mapa de calor do Digital)", esperado: "aprova",
     html: `<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><style>html,body{margin:0;overflow-x:hidden;overflow-x:clip}.heat{display:grid;grid-template-columns:repeat(24,15px);gap:2px;overflow-x:auto}.heat i{display:block;height:15px;background:#ccc}</style><div class=heat>${"<i></i>".repeat(24)}</div>` },
+  { nome: "tabela em modo cartão, thead escondido a -9999px", esperado: "aprova",
+    html: `<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><style>html,body{margin:0;overflow-x:hidden;overflow-x:clip;font:14px system-ui}.rtable table,.rtable thead,.rtable tbody,.rtable tr,.rtable td{display:block}.rtable thead{position:absolute;left:-9999px;height:0;overflow:hidden}.rtable td{display:flex;justify-content:space-between;padding:7px 12px}.rtable td::before{content:attr(data-label);font-size:10px;font-weight:800}.rtable td:first-child::before{display:none}</style><div class=rtable><table><thead><tr><th>Painel</th><th>Fonte principal</th><th>Disponibilidade</th></tr></thead><tbody><tr><td>Conversas</td><td data-label="Fonte principal">Tallos</td><td data-label="Disponibilidade">99,4%</td></tr></tbody></table></div>` },
   { nome: "página inteira anda para o lado", esperado: "reprova",
     html: `<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><style>html,body{margin:0;font:14px system-ui}.larga{width:900px;height:40px;background:#eee}</style><div class=larga>bloco mais largo que a tela</div>` },
 ];
