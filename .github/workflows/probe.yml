@@ -5,7 +5,8 @@ on:
 
 jobs:
   probe:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted   # VPS propria. Migrado em 19/08/2026: o orcamento de minutos do GitHub
+    # esgotou e nenhum job hospedado la inicia mais. Voltar atras = trocar por ubuntu-latest.
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6

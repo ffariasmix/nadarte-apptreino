@@ -25,7 +25,8 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted   # VPS propria. Migrado em 19/08/2026: o orcamento de minutos do GitHub
+    # esgotou e nenhum job hospedado la inicia mais. Voltar atras = trocar por ubuntu-latest.
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -71,7 +72,8 @@ jobs:
       - name: Instalar navegador
         run: |
           npm i --no-save playwright
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium || npx playwright install chromium   # --with-deps precisa de sudo; na VPS o runner nao tem, e as bibliotecas ja foram
+          # instaladas como root uma vez so (19/08/2026). Sem este fallback o passo morre la.
       - name: Medir responsividade do painel gerado
         run: node scripts/porteiro_responsivo.mjs --larguras 390,768,1024 --capturas ./capturas public/index.html
       - name: Anexar capturas de quem reprovou
