@@ -29,6 +29,15 @@ jobs:
     # esgotou e nenhum job hospedado la inicia mais. Voltar atras = trocar por ubuntu-latest.
     steps:
       - uses: actions/checkout@v5
+      # Sem isto o job depende do Node estar no PATH da MAQUINA. No runner do
+      # GitHub sempre estava; na VPS depende de como cada agente foi criado — o
+      # 'runner-dashboard', feito a mao antes dos outros, nao tem. Resultado em
+      # 21/08/2026: "npx: command not found", exit 127, e o card de frequencia do
+      # mes parou de atualizar por 3 rodadas sem ninguem notar.
+      # Instalar aqui deixa o workflow independente da configuracao da maquina.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
